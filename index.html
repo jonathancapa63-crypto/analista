@@ -104,9 +104,15 @@ table.plain th,table.plain td{padding:6px 8px;border-top:1px solid var(--line);t
 table.plain th:first-child,table.plain td:first-child{text-align:left}
 table.plain thead th{border-top:0;color:var(--muted);font-weight:500;font-size:12px}
 .tablewrap{overflow-x:auto}
-.lines{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px}
-.lines thead th:first-child{font-family:var(--display);font-size:16px;text-transform:uppercase;letter-spacing:.05em;color:var(--text)}
-.custom{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:8px}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.tab{font-size:15px;padding:8px 12px;white-space:nowrap}
+.tab.on,.seg button.on{background:var(--accent);border-color:var(--accent);color:#161200}
+.seg{display:flex;gap:4px}
+.ltab thead th{vertical-align:bottom;font-size:13px}
+.ltab thead th div{font-weight:400;font-size:11px;color:var(--muted)}
+.ltab td:first-child{white-space:nowrap}
+.rpanel{flex-basis:100%;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.h-item .rpanel input{width:100%}
 select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 10px;font:inherit}
 select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
@@ -216,7 +222,7 @@ footer{color:var(--muted);font-size:13px;max-width:70ch}
   <div id="robotStats"></div>
   <div>
     <h3>Historial y aprendizaje</h3>
-    <p class="small muted">Guarda cada pronóstico y, cuando termine el partido, registra el marcador final. Con cada resultado el robot reajusta sus ponderaciones.</p>
+    <p class="small muted">Guarda cada pronóstico y, cuando termine el partido, registra el resultado con sus estadísticas. Con cada partido el robot reajusta sus ponderaciones y sus líneas.</p>
   </div>
   <div class="hist" id="history"></div>
   <details>
@@ -314,6 +320,7 @@ function lossFor(done, th){
     L -= Math.log(Math.max(r.M[h][a],1e-9));
     const po = x.actual.h>x.actual.a ? r.p1 : x.actual.h===x.actual.a ? r.px : r.p2;
     L -= Math.log(Math.max(po,1e-9));
+    if(x.actual.xg) L += (Math.pow(r.lh-x.actual.xg[0],2)+Math.pow(r.la-x.actual.xg[1],2))/(2*0.7*0.7); // el xG real del partido también enseña
   }
   for(const k in THETA0) L += 0.5*Math.pow((th[k]-THETA0[k])/SIGMA[k],2);
   return L;
@@ -343,21 +350,53 @@ function countOver(mean,phi,line){
   else { const r=mean/(phi-1), q=1-1/phi; pm=Math.pow(1/phi,r); cdf=pm; for(let k=1;k<=kmax;k++){ pm*=(k-1+r)/k*q; cdf+=pm; } }
   return clamp(1-cdf,0,1);
 }
-function statMeans(m,b,stat){
+function statMeans(m,b,stat,cal){
   if(stat==='goals') return {home:b.lh,away:b.la,total:b.lh+b.la};
-  // Remates, tiros a puerta y córners se ajustan según cuánto ataque se espera de cada equipo en este partido
+  // Remates, tiros a puerta y córners se ajustan según cuánto ataque se espera de cada equipo; cal = calibración aprendida por el robot
+  const k=(cal&&cal[stat])||1;
   const fh=stat==='cards'?1:clamp(Math.sqrt(b.lh/b.H.att),0.85,1.2), fa=stat==='cards'?1:clamp(Math.sqrt(b.la/b.A.att),0.85,1.2);
-  const h=m.home[stat]*fh, a=m.away[stat]*fa; return {home:h,away:a,total:h+a};
+  const h=m.home[stat]*fh*k, a=m.away[stat]*fa*k; return {home:h,away:a,total:h+a};
 }
-function lineOver(m,b,stat,scope,line){
+function lineOver(m,b,stat,scope,line,cal){
   if(stat==='goals'){
     if(scope==='total'){ let s=0; for(let i=0;i<b.M.length;i++) for(let j=0;j<b.M.length;j++) if(i+j>line) s+=b.M[i][j]; return s; }
     return countOver(scope==='home'?b.lh:b.la,1,line);
   }
-  return countOver(statMeans(m,b,stat)[scope],PHI[stat],line);
+  return countOver(statMeans(m,b,stat,cal)[scope],PHI[stat],line);
 }
-function autoLines(mean){ const step=mean>20?2:1, c=Math.max(0.5,Math.round(mean)-0.5);
-  return [c-step,c,c+step].filter(x=>x>=0.5); }
+/* Filas de cada pestaña: el rango de líneas se adapta a la proyección del partido */
+function lineRows(mu,stat){
+  const r=[];
+  if(stat==='goals'){ const hi=Math.max(4.5,Math.round(mu.total)+1.5); for(let l=0.5;l<=hi;l++) r.push(l); return r; }
+  const sd=x=>Math.sqrt(Math.max(x,0.1)*PHI[stat]), lo0=Math.min(mu.home,mu.away);
+  const lo=Math.max(0.5,Math.floor(lo0-sd(lo0))+0.5), hi=Math.max(lo+2,Math.ceil(mu.total+sd(mu.total))-0.5);
+  const step=Math.max(1,Math.ceil((hi-lo)/16)); for(let l=lo;l<=hi+1e-9;l+=step) r.push(l); return r;
+}
+/* Jugada del robot por estadística: la línea cercana a la proyección con mayor probabilidad, sin pasar de 80% */
+function robotPicks(m,r,cal){
+  return STATS.map(([st])=>{ const mu=statMeans(m,r,st,cal); let best=null;
+    for(const sc of ['total','home','away']){ const c=Math.max(0.5,Math.round(mu[sc])-0.5);
+      for(const ln of [c-1,c,c+1]){ if(ln<0.5) continue; const p=lineOver(m,r,st,sc,ln,cal), q=Math.max(p,1-p);
+        if(q>0.8) continue; if(!best||q>best.q) best={st,s:sc,l:ln,o:p>=0.5?1:0,q}; } }
+    if(!best){ const c=Math.max(0.5,Math.round(mu.total)-0.5), p=lineOver(m,r,st,'total',c,cal); best={st,s:'total',l:c,o:p>=0.5?1:0,q:Math.max(p,1-p)}; }
+    best.p=Math.round(best.q*1e3)/1e3; delete best.q; return best; });
+}
+/* Calibración de remates, tiros a puerta, córners y tarjetas con los datos reales registrados */
+function calibrate(history){
+  const cal={}, cache=new Map();
+  for(const st of ['shots','sot','corners','cards']){ let s=0,n=0;
+    for(const x of history){ const a=x.actual&&x.actual[st]; if(!a) continue;
+      if(!cache.has(x)) cache.set(x,predict(x.inputs,THETA0));
+      const pred=statMeans(x.inputs,cache.get(x),st,null).total; if(pred>0){ s+=(a[0]+a[1])/pred; n++; } }
+    cal[st]=clamp((3+s)/(3+n),0.6,1.6); }
+  return cal;
+}
+function pickHit(pk,actual){ const v=pk.st==='goals'?[actual.h,actual.a]:actual[pk.st]; if(!v) return null;
+  const val=pk.s==='home'?v[0]:pk.s==='away'?v[1]:v[0]+v[1]; return (val>pk.l)===!!pk.o; }
+function lineRecord(history){ const out={}; for(const [st] of STATS) out[st]={n:0,ok:0};
+  for(const x of history){ if(!x.actual||!Array.isArray(x.picks)) continue;
+    for(const pk of x.picks){ const h=pickHit(pk,x.actual); if(h===null||!out[pk.st]) continue; out[pk.st].n++; if(h) out[pk.st].ok++; } }
+  return out; }
 function pick3(p){ return p.p1>=p.px&&p.p1>=p.p2 ? '1' : p.p2>=p.px ? '2' : 'X'; }
 function record(history){
   const done=history.filter(x=>x.actual&&x.robot&&x.base); let rOk=0,bOk=0,rB=0,bB=0,ou=0,bt=0;
@@ -445,6 +484,8 @@ function readForm(){
 
 /* ---------- Estado y memoria del robot ---------- */
 let state={v:1,theta:Object.assign({},THETA0),history:[],updatedAt:0};
+let lineTab='goals', lineSide='over', openId=null;
+function relearn(){ state.theta=train(state.history); state.cal=calibrate(state.history); }
 let current=null, saving=Promise.resolve(), cloudReady=false;
 const LS='analista-robot-v1';
 const tg=(window.Telegram&&window.Telegram.WebApp)||null;
@@ -479,7 +520,7 @@ function persist(){
 }
 async function loadMemory(){
   try{ const s=sanitize(JSON.parse(localStorage.getItem(LS))); if(s) state=s; }catch(e){}
-  state.theta=train(state.history); renderRobot();
+  relearn(); renderRobot();
   if(!CS){ setSync(inTg?'Actualiza Telegram para guardar en la nube':'Abre desde Telegram para guardar en la nube'); return; }
   setSync('Cargando desde Telegram');
   try{
@@ -489,7 +530,7 @@ async function loadMemory(){
       for(const k in vals){ try{ const x=JSON.parse(vals[k]); if(x&&x.inputs&&x.inputs.home&&x.inputs.away){ x.id=k.slice(2); remote.push(x); cloud.set(x.id,vals[k]); } }catch(e){} } }
     // Telegram manda. Lo guardado solo en este dispositivo se sube únicamente si la nube está vacía.
     if(remote.length){ remote.sort((p,q)=>(q.ts||0)-(p.ts||0)); state.history=remote.slice(0,200); }
-    state.theta=train(state.history); cloudReady=true; persist(); renderRobot(); if(current) analyze(current.m);
+    relearn(); cloudReady=true; persist(); renderRobot(); if(current) analyze(current.m);
     if(!state.history.length) setSync('Guardado en Telegram','good');
   }catch(e){ setSync('No se pudo leer Telegram; uso este dispositivo','bad'); }
 }
@@ -571,7 +612,8 @@ function robotOpinion(m,b,r){
 
 function analyze(m){
   const b=predict(m,THETA0), r=robotView(m,state.theta);
-  current={m,b,r};
+  const picks=robotPicks(m,r,state.cal);
+  current={m,b,r,picks};
   const h=m.home,a=m.away,hn=esc(h.name),an=esc(a.name), S=summary(m,b), [q1,qx,q2]=round3(b), t=b.top[0];
   const maxP=b.top[0].p, cells=[];
   for(let i=0;i<=5;i++){ let row=`<tr><th>${i}</th>`; for(let j=0;j<=5;j++){ const v=b.M[i][j]; const col=i>j?'76,194,255':i<j?'255,138,92':'147,163,181';
@@ -600,21 +642,11 @@ function analyze(m){
     </div>
     <p class="small muted">Más de 2.5 y Ambos marcan combinan el modelo (${pc(b.modelO25)} y ${pc(b.modelBtts)}) con la frecuencia histórica de los dos equipos (${pc(b.fOver)} y ${pc(b.fBtts)}).</p></div>
 
-  <div class="card"><div class="head"><h2>Líneas Más / Menos</h2><span class="small muted">En verde, 62% o más</span></div>
-    <div class="lines">${STATS.map(([k,l])=>{ const mu=statMeans(m,b,k);
-      return `<div class="tablewrap"><table class="plain"><thead><tr><th>${l}</th><th>Línea</th><th>Más</th><th>Menos</th></tr></thead><tbody>${
-        [['total','Total'],['home',hn],['away',an]].map(([sc,nm])=>autoLines(mu[sc]).map((ln,i,arr)=>{ const p=lineOver(m,b,k,sc,ln), hi=x=>x>=0.62?' style="color:var(--good);font-weight:600"':'';
-          return `<tr>${i===0?`<td rowspan="${arr.length}" class="${sc==='home'?'hc':sc==='away'?'ac':''}" style="vertical-align:top">${nm}<div class="small muted">Proy. ${f2(mu[sc])}</div></td>`:''}<td>${ln.toFixed(1)}</td><td${hi(p)}>${pc(p)}</td><td${hi(1-p)}>${pc(1-p)}</td></tr>`; }).join('')).join('')}</tbody></table></div>`; }).join('')}</div>
-    <div>
-      <h3>Calcula tu propia línea</h3>
-      <div class="custom">
-        <div class="field"><label for="cl_stat">Estadística</label><select id="cl_stat">${STATS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></div>
-        <div class="field"><label for="cl_scope">De quién</label><select id="cl_scope"><option value="total">Total del partido</option><option value="home">${hn}</option><option value="away">${an}</option></select></div>
-        <div class="field"><label for="cl_line">Línea</label><input type="number" id="cl_line" min="0.5" step="0.5" value="2.5" inputmode="decimal"></div>
-      </div>
-      <p id="cl_out" class="num" style="margin-top:10px" aria-live="polite"></p>
-    </div>
-    <p class="small muted">Remates, tiros a puerta, córners y tarjetas parten del promedio propio de cada equipo; la app no entrega cuántos concede cada rival, así que esas líneas son menos precisas que las de goles.</p></div>
+  <div class="card"><div class="head"><h2>Líneas</h2>
+      <div class="seg" id="lineSide"><button type="button" class="mini" data-side="over">Más de</button><button type="button" class="mini" data-side="under">Menos de</button></div></div>
+    <div class="tabs" role="tablist" id="lineTabs">${STATS.map(([k,l])=>`<button type="button" role="tab" class="tab" data-tab="${k}">${l}</button>`).join('')}</div>
+    <div id="lineBody"></div>
+    <p class="small muted">El rango de líneas de cada pestaña se ajusta a la proyección de este partido. En verde, 62% o más. Remates, tiros a puerta, córners y tarjetas parten del promedio propio de cada equipo, así que son menos precisas que las de goles.</p></div>
 
   <div class="card"><div class="head"><h2>Indicadores clave</h2><span class="small"><span class="hc">${hn}</span> · <span class="ac">${an}</span></span></div>
     <div class="tiles">
@@ -645,15 +677,26 @@ function analyze(m){
     <div class="tablewrap"><table class="plain"><thead><tr><th></th><th>Gana ${hn}</th><th>Empate</th><th>Gana ${an}</th></tr></thead><tbody>
       <tr><td>Modelo base</td><td>${q1}%</td><td>${qx}%</td><td>${q2}%</td></tr>
       <tr><td>Robot</td><td>${r1}%</td><td>${rx}%</td><td>${r2}%</td></tr></tbody></table></div>
+    <div><h3>Mis líneas recomendadas</h3>
+    <div class="tablewrap"><table class="plain"><thead><tr><th>Estadística</th><th>Jugada</th><th>Prob.</th></tr></thead><tbody>
+      ${picks.map(pk=>`<tr><td>${STATS.find(z=>z[0]===pk.st)[1]}</td><td>${{total:'Partido',home:hn,away:an}[pk.s]} · ${pk.o?'Más de':'Menos de'} ${pk.l.toFixed(1)}</td><td>${pc(pk.p)}</td></tr>`).join('')}</tbody></table></div></div>
     <div class="actions"><button type="button" class="primary" id="btnSave">Guardar pronóstico en el historial</button></div>
     <span class="small muted" id="saveMsg"></span></div>`;
   const box=$('results'); box.innerHTML=html; box.hidden=false;
   $('btnSave').onclick=savePrediction;
-  const cl=()=>{ const st=$('cl_stat').value, sc=$('cl_scope').value, ln=Number($('cl_line').value), out=$('cl_out');
-    if(!(ln>=0)||$('cl_line').value===''){ out.textContent='Ingresa una línea válida, por ejemplo 9.5.'; return; }
-    const p=lineOver(m,b,st,sc,ln), mu=statMeans(m,b,st)[sc];
-    out.innerHTML=`Más de ${ln}: <b>${pc(p)}</b> · ${Number.isInteger(ln)?'Hasta':'Menos de'} ${ln}: <b>${pc(1-p)}</b> <span class="muted">(proyección ${f2(mu)})</span>`; };
-  ['cl_stat','cl_scope','cl_line'].forEach(i=>$(i).addEventListener('input',cl)); cl();
+  $('lineTabs').onclick=e=>{ const t=e.target.closest('[data-tab]'); if(t){ lineTab=t.dataset.tab; renderLines(); } };
+  $('lineSide').onclick=e=>{ const t=e.target.closest('[data-side]'); if(t){ lineSide=t.dataset.side; renderLines(); } };
+  renderLines();
+}
+function renderLines(){
+  if(!current||!$('lineBody')) return; const {m,b}=current, st=lineTab, mu=statMeans(m,b,st,state.cal), hn=esc(m.home.name), an=esc(m.away.name);
+  document.querySelectorAll('#lineTabs .tab').forEach(t=>{ const on=t.dataset.tab===st; t.classList.toggle('on',on); t.setAttribute('aria-selected',on?'true':'false'); });
+  document.querySelectorAll('#lineSide button').forEach(t=>t.classList.toggle('on',t.dataset.side===lineSide));
+  const cell=p=>{ const v=lineSide==='over'?p:1-p; return `<td style="${v>=0.97||v<=0.03?'color:var(--muted)':v>=0.62?'color:var(--good);font-weight:600':''}">${pc(v)}</td>`; };
+  const k=st!=='goals'&&state.cal?state.cal[st]:1, word=lineSide==='over'?'Más de':'Menos de', name=STATS.find(z=>z[0]===st)[1];
+  $('lineBody').innerHTML=`<div class="tablewrap"><table class="plain ltab"><thead><tr><th>Línea</th><th>${name} partido<div>Proy. ${f2(mu.total)}</div></th><th class="hc">${hn}<div>Proy. ${f2(mu.home)}</div></th><th class="ac">${an}<div>Proy. ${f2(mu.away)}</div></th></tr></thead><tbody>${
+    lineRows(mu,st).map(ln=>`<tr><td>${word} ${ln.toFixed(1)}</td>${cell(lineOver(m,b,st,'total',ln,state.cal))}${cell(lineOver(m,b,st,'home',ln,state.cal))}${cell(lineOver(m,b,st,'away',ln,state.cal))}</tr>`).join('')}</tbody></table></div>`
+    +(Math.abs(k-1)>0.005?`<p class="small muted" style="margin-top:8px">Proyección ajustada por el robot ×${f2(k)} según los partidos que registraste.</p>`:'');
 }
 $('form').addEventListener('submit',e=>{ e.preventDefault(); const m=readForm();
   if(!m){ $('errors').scrollIntoView({block:'center',behavior:'smooth'}); return; }
@@ -661,11 +704,11 @@ $('form').addEventListener('submit',e=>{ e.preventDefault(); const m=readForm();
 
 function slim(p){ const r=x=>Math.round(x*1e4)/1e4; return {p1:r(p.p1),px:r(p.px),p2:r(p.p2),o25:r(p.o25),btts:r(p.btts)}; }
 function savePrediction(){
-  if(!current) return; const {m,b,r}=current;
-  state.history.unshift({id:newId(),ts:Date.now(),date:new Date().toISOString().slice(0,10),
+  if(!current) return; const {m,b,r,picks}=current;
+  state.history.unshift({picks,id:newId(),ts:Date.now(),date:new Date().toISOString().slice(0,10),
     inputs:JSON.parse(JSON.stringify(m)),base:slim(b),robot:slim(r),score:b.top[0].h+'-'+b.top[0].a,actual:null});
   state.history=state.history.slice(0,200); persist(); renderRobot();
-  $('btnSave').disabled=true; $('saveMsg').textContent='Guardado. Cuando termine el partido, registra el marcador final en el historial de abajo.';
+  $('btnSave').disabled=true; $('saveMsg').textContent='Guardado. Cuando termine el partido, registra el resultado y las estadísticas en el historial de abajo.';
 }
 
 /* ---------- Panel del robot ---------- */
@@ -684,17 +727,34 @@ function renderRobot(){
   h+=`<div class="tablewrap" style="margin-top:12px"><table class="plain"><thead><tr><th>Lo que el robot ha aprendido</th><th>De fábrica</th><th>Ahora</th></tr></thead><tbody>${
     Object.keys(PNAMES).map(k=>{ const [l,f]=PNAMES[k], ch=Math.abs(state.theta[k]-THETA0[k])>1e-6;
       return `<tr><td>${l}</td><td class="muted">${f(THETA0[k])}</td><td style="${ch?'color:var(--accent);font-weight:600':''}">${f(state.theta[k])}</td></tr>`; }).join('')}</tbody></table></div>`;
+  const lr=lineRecord(state.history), tot=Object.values(lr).reduce((a,v)=>({n:a.n+v.n,ok:a.ok+v.ok}),{n:0,ok:0}), cal=state.cal||{};
+  h+=`<div class="tablewrap" style="margin-top:12px"><table class="plain"><thead><tr><th>Líneas del robot${tot.n?` · ${pc(tot.ok/tot.n)} de acierto`:''}</th><th>Aciertos</th><th>Ajuste aprendido</th></tr></thead><tbody>${
+    STATS.map(([k,l])=>{ const c=cal[k]||1, ch=k!=='goals'&&Math.abs(c-1)>0.005;
+      return `<tr><td>${l}</td><td>${lr[k].n?lr[k].ok+' de '+lr[k].n:'<span class="muted">Sin datos</span>'}</td><td style="${ch?'color:var(--accent);font-weight:600':''}">${k==='goals'?'<span class="muted">Usa el modelo de goles</span>':'×'+f2(c)}</td></tr>`; }).join('')}</tbody></table></div>`;
   $('robotStats').innerHTML=h;
   const hist=$('history');
   if(!state.history.length){ hist.innerHTML='<p class="muted small">Aún no hay pronósticos guardados. Analiza un partido y pulsa "Guardar pronóstico en el historial".</p>'; return; }
   hist.innerHTML=state.history.map(x=>{ const hn=esc(x.inputs.home.name), an=esc(x.inputs.away.name);
-    const pk={'1':'1','X':'X','2':'2'}[pick3(x.robot||x.base)];
-    let right;
+    const pk=pick3(x.robot||x.base); let right, extra='';
     if(x.actual){ const res=x.actual.h>x.actual.a?'1':x.actual.h===x.actual.a?'X':'2', ok=pk===res;
-      right=`<span class="num"><b>${x.actual.h} – ${x.actual.a}</b></span><span class="pill ${ok?'good':'bad'}">${ok?'Robot acertó':'Robot falló'}</span>`; }
-    else right=`<input type="number" min="0" step="1" inputmode="numeric" id="rh_${x.id}" aria-label="Goles de ${hn}"><span>–</span><input type="number" min="0" step="1" inputmode="numeric" id="ra_${x.id}" aria-label="Goles de ${an}"><button type="button" class="mini" data-act="result" data-id="${x.id}">Registrar resultado</button>`;
-    return `<div class="h-item"><div><div class="t">${hn} vs ${an}</div><div class="small muted">${esc(x.date||'')} · Robot: ${pk} · Proyectado ${esc(x.score||'')}</div></div>
-      <div class="ctl">${right}<button type="button" class="mini" data-act="load" data-id="${x.id}">Cargar datos</button><button type="button" class="mini danger" data-act="del" data-id="${x.id}">Borrar</button></div></div>`; }).join('');
+      right=`<span class="num"><b>${x.actual.h} – ${x.actual.a}</b></span><span class="pill ${ok?'good':'bad'}">${ok?'Robot acertó':'Robot falló'}</span><button type="button" class="mini" data-act="open" data-id="${x.id}">Editar resultado</button>`;
+      const parts=RFIELDS.filter(f=>f[0]!=='goals'&&x.actual[f[0]]).map(f=>`${f[1]} ${x.actual[f[0]][0]}-${x.actual[f[0]][1]}`);
+      const hits=(x.picks||[]).map(p=>pickHit(p,x.actual)).filter(v=>v!==null);
+      if(hits.length) parts.push(`Líneas acertadas ${hits.filter(Boolean).length} de ${hits.length}`);
+      if(parts.length) extra=`<div class="small muted">${parts.join(' · ')}</div>`; }
+    else right=`<button type="button" class="mini" data-act="open" data-id="${x.id}">Registrar resultado</button>`;
+    return `<div class="h-item"><div><div class="t">${hn} vs ${an}</div><div class="small muted">${esc(x.date||'')} · Robot: ${pk} · Proyectado ${esc(x.score||'')}</div>${extra}</div>
+      <div class="ctl">${right}<button type="button" class="mini" data-act="load" data-id="${x.id}">Cargar datos</button><button type="button" class="mini danger" data-act="del" data-id="${x.id}">Borrar</button></div>${openId===x.id?resultPanel(x,hn,an):''}</div>`; }).join('');
+}
+const RFIELDS=[['goals','Goles',1,30],['corners','Córners',1,40],['shots','Remates',1,80],['sot','Tiros a puerta',1,40],['cards','Tarjetas',1,25],['xg','xG',0.01,12]];
+function resultPanel(x,hn,an){ const a=x.actual||{};
+  const get=(k,i)=>{ const v=k==='goals'?(x.actual?[a.h,a.a]:null):a[k]; return v?v[i]:''; };
+  const inp=(k,l,step,side,i)=>`<input type="number" min="0" step="${step}" inputmode="${step===1?'numeric':'decimal'}" id="r_${k}_${side}_${x.id}" value="${get(k,i)}" aria-label="${l}, ${side==='h'?'local':'visitante'}">`;
+  return `<div class="rpanel"><div class="colhead"><span class="hc">${hn}</span><span>Resultado real</span><span class="ac">${an}</span></div><div class="rows">${
+    RFIELDS.map(([k,l,step])=>`<div class="row"><div class="cell">${inp(k,l,step,'h',0)}</div><div class="lbl">${l}${k==='goals'?'':' <span class="muted small">(opcional)</span>'}</div><div class="cell">${inp(k,l,step,'a',1)}</div></div>`).join('')}</div>
+    <p class="small muted">El xG recibido no se pide: en un partido es el xG del rival.</p>
+    <span class="small" id="rmsg_${x.id}" style="color:var(--bad)" role="alert"></span>
+    <div class="actions"><button type="button" class="primary" data-act="saveres" data-id="${x.id}">Guardar resultado</button><button type="button" data-act="cancel" data-id="${x.id}">Cancelar</button></div></div>`;
 }
 function toForm(m){ const o={neutral:null};
   for(const [s,t] of [['h',m.home],['a',m.away]]){ o[s+'_name']=t.name; if(t.rank) o[s+'_rank']=t.rank; if(t.crowd!=null) o[s+'_crowd']=t.crowd;
@@ -703,22 +763,31 @@ function toForm(m){ const o={neutral:null};
   if(m.odds){ $('o1').value=m.odds[0]; $('ox').value=m.odds[1]; $('o2').value=m.odds[2]; } }
 $('history').addEventListener('click',e=>{ const btn=e.target.closest('button[data-act]'); if(!btn) return;
   const id=btn.dataset.id, i=state.history.findIndex(x=>x.id===id); if(i<0) return; const x=state.history[i];
-  if(btn.dataset.act==='del'){ if(btn.dataset.sure){ state.history.splice(i,1); state.theta=train(state.history); persist(); renderRobot(); if(current) analyze(current.m); } else { btn.dataset.sure='1'; btn.textContent='Confirmar borrado'; } }
+  if(btn.dataset.act==='del'){ if(btn.dataset.sure){ state.history.splice(i,1); relearn(); persist(); renderRobot(); if(current) analyze(current.m); } else { btn.dataset.sure='1'; btn.textContent='Confirmar borrado'; } }
   if(btn.dataset.act==='load'){ toForm(x.inputs); $('form').scrollIntoView({behavior:'smooth'}); }
-  if(btn.dataset.act==='result'){ const eh=$('rh_'+id), ea=$('ra_'+id), gh=eh.value===''?NaN:Number(eh.value), ga=ea.value===''?NaN:Number(ea.value);
-    const okh=Number.isInteger(gh)&&gh>=0&&gh<=30, oka=Number.isInteger(ga)&&ga>=0&&ga<=30; eh.classList.toggle('err',!okh); ea.classList.toggle('err',!oka);
-    if(!okh||!oka) return;
-    x.actual={h:gh,a:ga}; state.theta=train(state.history); persist(); renderRobot(); if(current) analyze(current.m); }
+  if(btn.dataset.act==='open'){ openId=id; renderRobot(); }
+  if(btn.dataset.act==='cancel'){ openId=null; renderRobot(); }
+  if(btn.dataset.act==='saveres'){ const act={}; let ok=true, msg='';
+    for(const [k,l,step,max] of RFIELDS){ const eh=$(`r_${k}_h_${id}`), ea=$(`r_${k}_a_${id}`), sh=eh.value.trim(), sa=ea.value.trim();
+      eh.classList.remove('err'); ea.classList.remove('err');
+      if(sh===''&&sa===''){ if(k==='goals'){ ok=false; eh.classList.add('err'); ea.classList.add('err'); msg='Ingresa los goles de ambos equipos.'; } continue; }
+      const vh=Number(sh), va=Number(sa), valid=(s,v)=>s!==''&&isFinite(v)&&v>=0&&v<=max&&(step!==1||Number.isInteger(v));
+      if(!valid(sh,vh)){ ok=false; eh.classList.add('err'); } if(!valid(sa,va)){ ok=false; ea.classList.add('err'); }
+      if(!valid(sh,vh)||!valid(sa,va)){ msg=msg||`Revisa "${l}": completa los dos lados con valores válidos o deja ambos vacíos.`; continue; }
+      if(k==='goals'){ act.h=vh; act.a=va; } else act[k]=[vh,va]; }
+    if(ok&&act.sot&&act.shots&&(act.sot[0]>act.shots[0]||act.sot[1]>act.shots[1])){ ok=false; msg='Los tiros a puerta no pueden superar los remates.'; }
+    if(!ok){ $('rmsg_'+id).textContent=msg; return; }
+    x.actual=act; openId=null; relearn(); persist(); renderRobot(); if(current) analyze(current.m); }
 });
 $('btnCopy').onclick=()=>{ const txt=JSON.stringify(state); $('backup').value=txt;
   const done=ok=>$('backupMsg').textContent=ok?'Respaldo copiado al portapapeles.':'El respaldo está en el cuadro de texto: selecciónalo y cópialo.';
   try{ navigator.clipboard.writeText(txt).then(()=>done(true),()=>done(false)); }catch(e){ done(false); } };
 $('btnRestore').onclick=()=>{ let s=null; try{ s=sanitize(JSON.parse($('backup').value)); }catch(e){}
   if(!s){ $('backupMsg').textContent='El texto pegado no es un respaldo válido.'; return; }
-  state=s; state.history.forEach((x,i)=>{ if(!x.ts) x.ts=Date.now()-i; }); state.theta=train(state.history); persist(); renderRobot(); if(current) analyze(current.m); $('backupMsg').textContent='Respaldo restaurado.'; };
+  state=s; state.history.forEach((x,i)=>{ if(!x.ts) x.ts=Date.now()-i; }); relearn(); persist(); renderRobot(); if(current) analyze(current.m); $('backupMsg').textContent='Respaldo restaurado.'; };
 $('btnReset').onclick=e=>{ const b=e.currentTarget; if(!b.dataset.sure){ b.dataset.sure='1'; b.textContent='Confirmar: borrar todo'; return; }
   delete b.dataset.sure; b.textContent='Borrar memoria del robot';
-  state={v:1,theta:Object.assign({},THETA0),history:[],updatedAt:0}; persist(); renderRobot(); if(current) analyze(current.m); $('backupMsg').textContent='Memoria borrada.'; };
+  state={v:1,theta:Object.assign({},THETA0),history:[],updatedAt:0}; relearn(); persist(); renderRobot(); if(current) analyze(current.m); $('backupMsg').textContent='Memoria borrada.'; };
 
 loadMemory();
 </script>
