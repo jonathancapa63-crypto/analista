@@ -135,7 +135,7 @@ footer{color:var(--muted);font-size:13px;max-width:70ch}
   .scoreline .name{font-size:17px}
   .row,.colhead{grid-template-columns:78px 1fr 78px;gap:6px}
   .row .lbl{font-size:13px}
-  input[type=number]{padding:8px 4px}
+  input[data-num]{padding:8px 4px}
   .teams{gap:8px}
   .bar{grid-template-columns:110px 1fr 46px}
 }
@@ -158,16 +158,16 @@ footer{color:var(--muted);font-size:13px;max-width:70ch}
       <span class="tag hc">Equipo local</span>
       <div class="field"><label for="h_name">Nombre</label><input type="text" id="h_name" placeholder="Local" autocomplete="off"></div>
       <div class="duo">
-        <div class="field"><label for="h_rank">Ranking (opcional)</label><input type="number" id="h_rank" min="1" step="1" inputmode="numeric"></div>
-        <div class="field"><label for="h_n">Últimos N partidos</label><input type="number" id="h_n" min="1" step="1" inputmode="numeric"></div>
+        <div class="field"><label for="h_rank">Ranking (opcional)</label><input type="text" data-num id="h_rank" min="1" step="1" inputmode="numeric"></div>
+        <div class="field"><label for="h_n">Últimos N partidos</label><input type="text" data-num id="h_n" min="1" step="1" inputmode="numeric"></div>
       </div>
     </div>
     <div class="team away">
       <span class="tag ac">Equipo visitante</span>
       <div class="field"><label for="a_name">Nombre</label><input type="text" id="a_name" placeholder="Visitante" autocomplete="off"></div>
       <div class="duo">
-        <div class="field"><label for="a_rank">Ranking (opcional)</label><input type="number" id="a_rank" min="1" step="1" inputmode="numeric"></div>
-        <div class="field"><label for="a_n">Últimos N partidos</label><input type="number" id="a_n" min="1" step="1" inputmode="numeric"></div>
+        <div class="field"><label for="a_rank">Ranking (opcional)</label><input type="text" data-num id="a_rank" min="1" step="1" inputmode="numeric"></div>
+        <div class="field"><label for="a_n">Últimos N partidos</label><input type="text" data-num id="a_n" min="1" step="1" inputmode="numeric"></div>
       </div>
     </div>
   </div>
@@ -191,14 +191,14 @@ footer{color:var(--muted);font-size:13px;max-width:70ch}
   <div class="colhead"><span class="hc">Local</span><span>Empate</span><span class="ac">Visitante</span></div>
   <div class="rows">
     <div class="row">
-      <div class="cell"><input type="number" id="o1" step="0.01" min="1" inputmode="decimal" aria-label="Cuota local"></div>
-      <div class="cell"><input type="number" id="ox" step="0.01" min="1" inputmode="decimal" aria-label="Cuota empate" style="max-width:130px;margin:0 auto"><div class="pct">Cuotas 1 · X · 2</div></div>
-      <div class="cell"><input type="number" id="o2" step="0.01" min="1" inputmode="decimal" aria-label="Cuota visitante"></div>
+      <div class="cell"><input type="text" data-num id="o1" step="0.01" min="1" inputmode="decimal" aria-label="Cuota local"></div>
+      <div class="cell"><input type="text" data-num id="ox" step="0.01" min="1" inputmode="decimal" aria-label="Cuota empate" style="max-width:130px;margin:0 auto"><div class="pct">Cuotas 1 · X · 2</div></div>
+      <div class="cell"><input type="text" data-num id="o2" step="0.01" min="1" inputmode="decimal" aria-label="Cuota visitante"></div>
     </div>
     <div class="row">
-      <div class="cell"><input type="number" id="h_crowd" step="1" min="0" max="100" inputmode="numeric" aria-label="Porcentaje comunidad local"></div>
+      <div class="cell"><input type="text" data-num id="h_crowd" step="1" min="0" max="100" inputmode="numeric" aria-label="Porcentaje comunidad local"></div>
       <div class="lbl">% de la comunidad que predice su victoria</div>
-      <div class="cell"><input type="number" id="a_crowd" step="1" min="0" max="100" inputmode="numeric" aria-label="Porcentaje comunidad visitante"></div>
+      <div class="cell"><input type="text" data-num id="a_crowd" step="1" min="0" max="100" inputmode="numeric" aria-label="Porcentaje comunidad visitante"></div>
     </div>
   </div>
 
@@ -423,18 +423,24 @@ const pc=x=>Math.round(x*100)+'%';
 const f2=x=>(Math.round(x*100)/100).toFixed(2);
 
 $('rowsRes').innerHTML=RES.map(([k,l])=>`<div class="row">
-  <div class="cell"><input type="number" id="h_${k}" min="0" step="1" inputmode="numeric" aria-label="${l}, local"><div class="pct" id="h_${k}_p"></div></div>
+  <div class="cell"><input type="text" data-num id="h_${k}" min="0" step="1" inputmode="numeric" aria-label="${l}, local"><div class="pct" id="h_${k}_p"></div></div>
   <div class="lbl">${l}</div>
-  <div class="cell"><input type="number" id="a_${k}" min="0" step="1" inputmode="numeric" aria-label="${l}, visitante"><div class="pct" id="a_${k}_p"></div></div></div>`).join('');
+  <div class="cell"><input type="text" data-num id="a_${k}" min="0" step="1" inputmode="numeric" aria-label="${l}, visitante"><div class="pct" id="a_${k}_p"></div></div></div>`).join('');
 $('rowsAvg').innerHTML=AVG.map(([k,l])=>`<div class="row">
-  <div class="cell"><input type="number" id="h_${k}" min="0" step="0.01" inputmode="decimal" aria-label="${l}, local"></div>
+  <div class="cell"><input type="text" data-num id="h_${k}" min="0" step="0.01" inputmode="decimal" aria-label="${l}, local"></div>
   <div class="lbl">${l}</div>
-  <div class="cell"><input type="number" id="a_${k}" min="0" step="0.01" inputmode="decimal" aria-label="${l}, visitante"></div></div>`).join('')+
+  <div class="cell"><input type="text" data-num id="a_${k}" min="0" step="0.01" inputmode="decimal" aria-label="${l}, visitante"></div></div>`).join('')+
  `<div class="row">
-  <div class="cell"><div class="pen"><input type="number" id="h_penScored" min="0" step="1" inputmode="numeric" aria-label="Penales convertidos, local"><span>/</span><input type="number" id="h_penTaken" min="0" step="1" inputmode="numeric" aria-label="Penales ejecutados, local"></div></div>
+  <div class="cell"><div class="pen"><input type="text" data-num id="h_penScored" min="0" step="1" inputmode="numeric" aria-label="Penales convertidos, local"><span>/</span><input type="text" data-num id="h_penTaken" min="0" step="1" inputmode="numeric" aria-label="Penales ejecutados, local"></div></div>
   <div class="lbl">Penales convertidos / ejecutados <span class="muted small">(opcional)</span></div>
-  <div class="cell"><div class="pen"><input type="number" id="a_penScored" min="0" step="1" inputmode="numeric" aria-label="Penales convertidos, visitante"><span>/</span><input type="number" id="a_penTaken" min="0" step="1" inputmode="numeric" aria-label="Penales ejecutados, visitante"></div></div></div>`;
+  <div class="cell"><div class="pen"><input type="text" data-num id="a_penScored" min="0" step="1" inputmode="numeric" aria-label="Penales convertidos, visitante"><span>/</span><input type="text" data-num id="a_penTaken" min="0" step="1" inputmode="numeric" aria-label="Penales ejecutados, visitante"></div></div></div>`;
 
+/* Campos numéricos como texto: el teclado del celular puede mostrar coma; se convierte a punto al escribir */
+document.addEventListener('input',e=>{ const t=e.target; if(!t.matches||!t.matches('input[data-num]')) return;
+  const v=t.value, dec=t.getAttribute('inputmode')==='decimal';
+  let n=dec?v.replace(/,/g,'.').replace(/[^0-9.]/g,''):v.replace(/[^0-9]/g,'');
+  if(dec){ const i=n.indexOf('.'); if(i>=0) n=n.slice(0,i+1)+n.slice(i+1).replace(/\./g,''); }
+  if(n!==v) t.value=n; },true);
 const val=id=>{const v=$(id).value.trim().replace(',','.'); return v===''?null:Number(v);};
 function updatePcts(){
   for(const s of ['h','a']){ const n=val(s+'_n');
@@ -749,7 +755,7 @@ function renderRobot(){
 const RFIELDS=[['goals','Goles',1,30],['corners','Córners',1,40],['shots','Remates',1,80],['sot','Tiros a puerta',1,40],['cards','Tarjetas',1,25],['xg','xG',0.01,12]];
 function resultPanel(x,hn,an){ const a=x.actual||{};
   const get=(k,i)=>{ const v=k==='goals'?(x.actual?[a.h,a.a]:null):a[k]; return v?v[i]:''; };
-  const inp=(k,l,step,side,i)=>`<input type="number" min="0" step="${step}" inputmode="${step===1?'numeric':'decimal'}" id="r_${k}_${side}_${x.id}" value="${get(k,i)}" aria-label="${l}, ${side==='h'?'local':'visitante'}">`;
+  const inp=(k,l,step,side,i)=>`<input type="text" data-num min="0" step="${step}" inputmode="${step===1?'numeric':'decimal'}" id="r_${k}_${side}_${x.id}" value="${get(k,i)}" aria-label="${l}, ${side==='h'?'local':'visitante'}">`;
   return `<div class="rpanel"><div class="colhead"><span class="hc">${hn}</span><span>Resultado real</span><span class="ac">${an}</span></div><div class="rows">${
     RFIELDS.map(([k,l,step])=>`<div class="row"><div class="cell">${inp(k,l,step,'h',0)}</div><div class="lbl">${l}${k==='goals'?'':' <span class="muted small">(opcional)</span>'}</div><div class="cell">${inp(k,l,step,'a',1)}</div></div>`).join('')}</div>
     <p class="small muted">El xG recibido no se pide: en un partido es el xG del rival.</p>
