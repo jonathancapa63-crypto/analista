@@ -1,0 +1,2 @@
+# analista
+ANALIZAR PARTIDOS
