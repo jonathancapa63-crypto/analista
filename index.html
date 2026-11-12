@@ -201,7 +201,7 @@ footer{color:var(--muted);font-size:12px;max-width:70ch}
 
 /* Navegación: fija abajo en móvil */
 .maintabs{position:fixed;left:0;right:0;bottom:0;z-index:10;height:var(--nav);display:flex;justify-content:center;background:rgba(13,20,38,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:0 4px}
-.maintabs button{position:relative;flex:1 1 0;max-width:110px;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0;border:0;border-radius:0;background:none;color:var(--muted);font-size:10.5px;font-weight:500}
+.maintabs button{position:relative;flex:1 1 0;max-width:100px;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0;border:0;border-radius:0;background:none;color:var(--muted);font-size:10px;font-weight:500}
 .maintabs button span{white-space:nowrap}
 .maintabs button.on{color:var(--accent)}
 .maintabs button.on::before{content:"";position:absolute;top:0;left:22%;right:22%;height:3px;border-radius:0 0 3px 3px;background:var(--accent)}
@@ -211,6 +211,7 @@ footer{color:var(--muted);font-size:12px;max-width:70ch}
 
 [data-pane]{display:none}
 body[data-tab="partido"] [data-pane~="partido"],
+body[data-tab="hoy"] [data-pane~="hoy"],
 body[data-tab="analisis"] [data-pane~="analisis"],
 body[data-tab="lineas"] [data-pane~="lineas"],
 body[data-tab="robot"] [data-pane~="robot"],
@@ -256,11 +257,12 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
 </header>
 <nav class="maintabs" id="mainTabs" role="tablist" aria-label="Secciones">
   <button type="button" role="tab" data-go="partido"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/></svg><span>Partido</span></button>
+  <button type="button" role="tab" data-go="hoy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4M9 15l2 2 4-4"/></svg><span>Hoy</span></button>
   <button type="button" role="tab" data-go="analisis"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Análisis</span></button>
   <button type="button" role="tab" data-go="lineas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-6 4 3 6-8M3 21h18"/></svg><span>Líneas</span></button>
   <button type="button" role="tab" data-go="robot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 8V4M9 13h.01M15 13h.01M10 16h4"/></svg><span>Robot</span></button>
   <button type="button" role="tab" data-go="historial" id="tabHist"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>Historial</span><b class="badge" id="histBadge" hidden></b></button>
-  <button type="button" role="tab" data-go="rvm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/></svg><span>Vs mercado</span></button>
+  <button type="button" role="tab" data-go="rvm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/></svg><span>Mercado</span></button>
   <button type="button" role="tab" data-go="memoria"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-4 10.5V17h8v-3.5A6 6 0 0 0 12 3zM9 21h6"/></svg><span>Memoria</span></button>
 </nav>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -342,10 +344,16 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
 
 <div class="card" id="noAnalysis" data-pane="analisis lineas robot">
   <h2>Sin análisis todavía</h2>
-  <p class="muted">Ingresa los datos en la pestaña Partido y pulsa "Analizar partido". También puedes cargar un partido guardado desde Historial.</p>
+  <p class="muted">Ingresa los datos en la pestaña Partido y pulsa "Analizar partido". También puedes abrir uno de los partidos de la pestaña Hoy.</p>
   <div class="actions"><button type="button" data-go="partido">Ir a Partido</button></div>
 </div>
 <section id="results" hidden style="display:contents"></section>
+
+<section class="card" data-pane="hoy">
+  <div class="head"><h2>Partidos de hoy</h2><span class="small muted" id="hoyCount"></span></div>
+  <p class="small muted" style="max-width:65ch">Cada partido que analizas queda aquí durante dos días con todos sus datos. Ábrelo cuando quieras para volver a ver el análisis o buscar otra jugada, sin escribir nada de nuevo.</p>
+  <div class="hist" id="today"></div>
+</section>
 
 <section class="card" data-pane="historial">
   <div class="head"><h2>Historial</h2></div>
@@ -394,15 +402,20 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
 
 <script>
 /*ENGINE*/
-const APP_VERSION='v10 · 2026-11-11';
+const APP_VERSION='v12 · 2026-11-12';
 const TRAIN_MAX=500;        // partidos recientes que usa el ajuste de ponderaciones
 const MU = 1.35;            // goles promedio por equipo y partido (referencia)
 const RHO = -0.10;          // corrección Dixon-Coles para marcadores bajos
 const SHRINK = 6;           // partidos "fantasma" que acercan muestras chicas al promedio
-const THETA0 = {sharp:1.00, wXG:0.60, homeAdv:1.20, rankK:0.25, formK:0.30, goalScale:1.00, wEmp:0.20, wForm:0.30};
-const BOUNDS = {sharp:[0.60,1.50], wXG:[0,1], homeAdv:[1.00,1.50], rankK:[0,0.80], formK:[0,1.20], goalScale:[0.70,1.40], wEmp:[0,0.60], wForm:[0,0.60]};
-const SIGMA  = {sharp:0.20, wXG:0.25, homeAdv:0.12, rankK:0.20, formK:0.30, goalScale:0.12, wEmp:0.15, wForm:0.15};
+const THETA0 = {wMkt:0.35, sharp:1.00, wXG:0.60, homeAdv:1.20, rankK:0.25, formK:0.30, goalScale:1.00, wEmp:0.20, wForm:0.30};
+const BOUNDS = {wMkt:[0,0.85], sharp:[0.60,1.50], wXG:[0,1], homeAdv:[1.00,1.50], rankK:[0,0.80], formK:[0,1.20], goalScale:[0.70,1.40], wEmp:[0,0.60], wForm:[0,0.60]};
+const SIGMA  = {wMkt:0.20, sharp:0.20, wXG:0.25, homeAdv:0.12, rankK:0.20, formK:0.30, goalScale:0.12, wEmp:0.15, wForm:0.15};
 const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
+// Lo aprendido envejece: un partido de hace 180 días pesa la mitad que uno de hoy
+const HALF_LIFE=180; let NOW=Date.now();
+const wAge=x=>{ const t=x.ts||Date.parse(x.date)||NOW; return Math.pow(0.5,Math.max(0,NOW-t)/864e5/HALF_LIFE); };
+// Probabilidades de la casa sin su margen
+const mktProbs=o=>{ const inv=o.map(v=>1/v), s=inv[0]+inv[1]+inv[2]; return inv.map(v=>v/s); };
 
 function sideRatings(t, th, tAtt, tDef){
   const k = t.n/(t.n+SHRINK);
@@ -451,18 +464,20 @@ function outcomes(M){
 }
 /* Modelo principal con los parámetros dados */
 function predict(m, th, share, adj){
-  const sh=share||0.45;   // parte de los goles que cae en el primer tiempo
+  // Parte de los goles de cada equipo que cae en el primer tiempo (un número común o uno por equipo)
+  const sH=share&&typeof share==='object'?share.h:(share||0.45), sA=share&&typeof share==='object'?share.a:(share||0.45);
   const {lh,la,H,A} = lambdas(m, th, adj);
   const M = scoreMatrix(lh,la,RHO), o = outcomes(M);
   // La frecuencia histórica de cada mercado se muestra como contexto; no se mezcla, para que todas las cifras de goles salgan de la misma matriz
   const fOver=(m.home.over25/m.home.n+m.away.over25/m.away.n)/2, fBtts=(m.home.btts/m.home.n+m.away.btts/m.away.n)/2;
   const over25=o.o25, btts=o.btts;
   let cs1=0, cs2=0; for(let i=0;i<M.length;i++){ cs1+=M[i][0]; cs2+=M[0][i]; }
-  const oh=outcomes(scoreMatrix(lh*sh,la*sh,0));
+  const oh=outcomes(scoreMatrix(lh*sH,la*sA,0));
   const any=1-Math.exp(-(lh+la));
   return {lh,la,H,A,M,p1:o.p1,px:o.px,p2:o.p2,o15:o.o15,o25:over25,o35:o.o35,btts,top:o.top,
     modelO25:o.o25, modelBtts:o.btts, fOver, fBtts,
-    htShare:sh, ht1:oh.p1, htx:oh.px, ht2:oh.p2, first1:any*lh/(lh+la), first2:any*la/(lh+la), none:1-any,
+    h1:{home:lh*sH,away:la*sA,total:lh*sH+la*sA}, h2:{home:lh*(1-sH),away:la*(1-sA),total:lh*(1-sH)+la*(1-sA)},
+    htShare:(lh*sH+la*sA)/(lh+la), ht1:oh.p1, htx:oh.px, ht2:oh.p2, first1:any*lh/(lh+la), first2:any*la/(lh+la), none:1-any,
     cs1, cs2,
     corners:m.home.corners+m.away.corners, cards:m.home.cards+m.away.cards};
 }
@@ -473,7 +488,10 @@ function robotView(m, th, share, adj){
   const w=th.wEmp, k=th.sharp||1;
   // sharp: calibración aprendida. Menor que 1 acerca las probabilidades entre sí (robot menos seguro); mayor que 1 las separa.
   let p1=Math.pow((1-w)*b.p1+w*e1,k), px=Math.pow((1-w)*b.px+w*ex,k), p2=Math.pow((1-w)*b.p2+w*e2,k); const t=p1+px+p2;
-  return Object.assign({}, b, {p1:p1/t, px:px/t, p2:p2/t, emp:{e1,ex,e2}});
+  p1/=t; px/=t; p2/=t;
+  // Si hay cuotas 1X2, el robot las mezcla con su propio pronóstico (peso aprendido wMkt): la casa conoce bajas y alineaciones que estos datos no traen
+  let mkt=null; if(m.odds){ mkt=mktProbs(m.odds); const wm=th.wMkt; p1=(1-wm)*p1+wm*mkt[0]; px=(1-wm)*px+wm*mkt[1]; p2=(1-wm)*p2+wm*mkt[2]; }
+  return Object.assign({}, b, {p1, px, p2, emp:{e1,ex,e2}, mkt});
 }
 /* Aprendizaje: ajusta los parámetros para explicar mejor los resultados registrados */
 function lossFor(done, th){
@@ -486,11 +504,14 @@ function lossFor(done, th){
     for(let i=0;i<=8;i++) for(let j=0;j<=8;j++){ const v=ph[i]*pa[j]*(i<2&&j<2?tau(i,j):1); if(i>j)p1+=v; else if(i===j)px+=v; else p2+=v; }
     const t=p1+px+p2, w=th.wEmp; let e1=(H.w+A.l)/2, ex=(H.d+A.d)/2, e2=(A.w+H.l)/2; const s=e1+ex+e2||1;
     const h=Math.min(8,x.actual.h), a=Math.min(8,x.actual.a);
-    L -= Math.log(Math.max(ph[h]*pa[a]*(h<2&&a<2?tau(h,a):1)/t,1e-9));
+    const wt=wAge(x);
+    L -= wt*Math.log(Math.max(ph[h]*pa[a]*(h<2&&a<2?tau(h,a):1)/t,1e-9));
     const k=th.sharp||1, q1=Math.pow((1-w)*p1/t+w*e1/s,k), qx=Math.pow((1-w)*px/t+w*ex/s,k), q2=Math.pow((1-w)*p2/t+w*e2/s,k);
-    const po = (x.actual.h>x.actual.a ? q1 : x.actual.h===x.actual.a ? qx : q2)/(q1+qx+q2);
-    L -= Math.log(Math.max(po,1e-9));
-    if(x.actual.xg) L += (Math.pow(lh-x.actual.xg[0],2)+Math.pow(la-x.actual.xg[1],2))/(2*0.7*0.7); // el xG real del partido también enseña
+    let P=[q1,qx,q2].map(v=>v/(q1+qx+q2));
+    if(x.inputs.odds){ const mk=mktProbs(x.inputs.odds), wm=th.wMkt; P=P.map((v,i)=>(1-wm)*v+wm*mk[i]); }
+    const po = x.actual.h>x.actual.a ? P[0] : x.actual.h===x.actual.a ? P[1] : P[2];
+    L -= wt*Math.log(Math.max(po,1e-9));
+    if(x.actual.xg) L += wt*(Math.pow(lh-x.actual.xg[0],2)+Math.pow(la-x.actual.xg[1],2))/(2*0.7*0.7); // el xG real del partido también enseña
   }
   for(const k in THETA0) L += 0.5*Math.pow((th[k]-THETA0[k])/SIGMA[k],2);
   return L;
@@ -525,7 +546,8 @@ function statMeans(m,b,stat,cal){
   // Remates, tiros a puerta y córners se ajustan según cuánto ataque se espera de cada equipo; cal = calibración aprendida por el robot
   const k=(cal&&cal[stat])||1;
   const fh=stat==='cards'?1:clamp(Math.sqrt(b.lh/b.H.att),0.85,1.2), fa=stat==='cards'?1:clamp(Math.sqrt(b.la/b.A.att),0.85,1.2);
-  const h=m.home[stat]*fh*k, a=m.away[stat]*fa*k; return {home:h,away:a,total:h+a};
+  const tm=cal&&cal.team&&cal.team[stat];   // memoria por equipo de esta estadística, si la hay
+  const h=m.home[stat]*fh*k*(tm?tm.h:1), a=m.away[stat]*fa*k*(tm?tm.a:1); return {home:h,away:a,total:h+a};
 }
 function lineOver(m,b,stat,scope,line,cal){
   if(stat==='goals'){
@@ -555,6 +577,10 @@ function robotPicks(m,r,cal){
   for(const ln of [0.5,1.5,2.5]){ const p=countOver(hm,1,ln), q=Math.max(p,1-p); if(q>0.75) continue; if(!bg||q>bg.q) bg={st:'htg',s:'total',l:ln,o:p>=0.5?1:0,q}; }
   if(!bg){ const p=countOver(hm,1,0.5); bg={st:'htg',s:'total',l:0.5,o:p>=0.5?1:0,q:Math.max(p,1-p)}; }
   bg.p=Math.round(bg.q*1e3)/1e3; delete bg.q; picks.push(bg);
+  { let b2=null; const m2=r.h2.total;
+    for(const ln of [0.5,1.5,2.5]){ const p=countOver(m2,1,ln), q=Math.max(p,1-p); if(q>0.75) continue; if(!b2||q>b2.q) b2={st:'h2g',s:'total',l:ln,o:p>=0.5?1:0,q}; }
+    if(!b2){ const p=countOver(m2,1,1.5); b2={st:'h2g',s:'total',l:1.5,o:p>=0.5?1:0,q:Math.max(p,1-p)}; }
+    b2.p=Math.round(b2.q*1e3)/1e3; delete b2.q; picks.push(b2); }
   const hr=[['1',r.ht1],['X',r.htx],['2',r.ht2]].sort((x,y)=>y[1]-x[1])[0];
   picks.push({st:'htr',r:hr[0],p:Math.round(hr[1]*1e3)/1e3});
   return picks;
@@ -565,10 +591,10 @@ function calibrate(history){
   for(const st of ['shots','sot','corners','cards']){ let s=0,n=0;
     for(const x of history){ const a=x.actual&&x.actual[st]; if(!a) continue;
       if(!cache.has(x)) cache.set(x,lambdas(x.inputs,THETA0));
-      const pred=statMeans(x.inputs,cache.get(x),st,null).total; if(pred>0){ s+=(a[0]+a[1])/pred; n++; } }
+      const pred=statMeans(x.inputs,cache.get(x),st,null).total, w=wAge(x); if(pred>0){ s+=w*(a[0]+a[1])/pred; n+=w; } }
     cal[st]=clamp((3+s)/(3+n),0.6,1.6); }
   // Reparto de goles en el primer tiempo: parte de 45% y se corrige con los descansos registrados
-  let hg=0, fg=0; for(const x of history){ const t=x.actual&&x.actual.ht; if(t){ hg+=t[0]+t[1]; fg+=x.actual.h+x.actual.a; } }
+  let hg=0, fg=0; for(const x of history){ const t=x.actual&&x.actual.ht; if(t){ const w=wAge(x); hg+=w*(t[0]+t[1]); fg+=w*(x.actual.h+x.actual.a); } }
   cal.ht=clamp((0.45*14+hg)/(14+fg),0.30,0.60);
   return cal;
 }
@@ -585,19 +611,19 @@ function extraMarkets(p){
   x['dnb:1']=p.p1/(p.p1+p.p2); x['dnb:2']=1-x['dnb:1'];
   x['btts:y']=p.btts; x['btts:n']=1-p.btts;
   x['htr:1']=p.ht1; x['htr:X']=p.htx; x['htr:2']=p.ht2;
-  const s=p.htShare, K=6, h1=pois(p.lh*s,K), a1=pois(p.la*s,K), h2=pois(p.lh*(1-s),K), a2=pois(p.la*(1-s),K), sg=d=>d>0?'1':d<0?'2':'X', y={}; let tot=0;
+  const K=6, h1=pois(p.h1.home,K), a1=pois(p.h1.away,K), h2=pois(p.h2.home,K), a2=pois(p.h2.away,K), sg=d=>d>0?'1':d<0?'2':'X', y={}; let tot=0;
   for(let i=0;i<=K;i++) for(let j=0;j<=K;j++){ const pij=h1[i]*a1[j];
     for(let k=0;k<=K;k++) for(let l=0;l<=K;l++){ const q=pij*h2[k]*a2[l]; tot+=q;
       const c1='htft:'+sg(i-j)+'/'+sg(i+k-j-l), g1=i+j, g2=k+l, c2='half:'+(g1>g2?'1':g2>g1?'2':'eq');
       y[c1]=(y[c1]||0)+q; y[c2]=(y[c2]||0)+q; } }
   for(const k in y) x[k]=y[k]/tot;
   for(const f of ['1','X','2']){ const ks=['1','X','2'].map(u=>'htft:'+u+'/'+f), sum=ks.reduce((u,k)=>u+(x[k]||0),0); if(sum>0) ks.forEach(k=>{ x[k]=(x[k]||0)*x['ft:'+f]/sum; }); }
-  const m2=(p.lh+p.la)*(1-s); x['2h:o:0.5']=countOver(m2,1,0.5); x['2h:o:1.5']=countOver(m2,1,1.5);
+  const m2=p.h2.total; x['2h:o:0.5']=countOver(m2,1,0.5); x['2h:o:1.5']=countOver(m2,1,1.5);
   return x;
 }
 function marketProb(code,m,p,x,cal){ const c=code.split(':');
   if(c[0]==='ln'){ const l=Number(c[4]); let o;
-    if(c[1]==='htg'){ const mu={home:p.lh*p.htShare,away:p.la*p.htShare}; mu.total=mu.home+mu.away; o=countOver(mu[c[2]],1,l); }
+    if(c[1]==='htg'||c[1]==='h2g'){ o=countOver((c[1]==='htg'?p.h1:p.h2)[c[2]],1,l); }
     else o=lineOver(m,p,c[1],c[2],l,cal);
     return c[3]==='o'?o:1-o; }
   if(c[0]==='cs'){ const u=c[1].split('-'), r=p.M[Number(u[0])]; return (r&&r[Number(u[1])])||0; }
@@ -621,7 +647,7 @@ function settle(code,a){
     case '2h': return t?W((a.h+a.a-t[0]-t[1])>Number(c[2])):'pending';
     case 'half': { if(!t) return 'pending'; const g1=t[0]+t[1], g2=a.h+a.a-g1; return W(c[1]==='1'?g1>g2:c[1]==='2'?g2>g1:g1===g2); }
     case 'htft': { if(!t) return 'pending'; const u=c[1].split('/'); return W(sg(t[0]-t[1])===u[0]&&res===u[1]); }
-    case 'ln': { const v=c[1]==='goals'?[a.h,a.a]:c[1]==='htg'?t:a[c[1]]; if(!v) return 'pending';
+    case 'ln': { const v=c[1]==='goals'?[a.h,a.a]:c[1]==='htg'?t:c[1]==='h2g'?(t?[a.h-t[0],a.a-t[1]]:null):a[c[1]]; if(!v) return 'pending';
       const val=c[2]==='home'?v[0]:c[2]==='away'?v[1]:v[0]+v[1]; return W((val>Number(c[4]))===(c[3]==='o')); }
   }
   return 'pending';
@@ -645,7 +671,7 @@ function codeLabel(code,hn,an){
     case '2h': return '2º tiempo · Más de '+c[2]+' goles';
     case 'half': return {'1':'Más goles en el 1er tiempo','2':'Más goles en el 2º tiempo','eq':'Mismos goles en ambos tiempos'}[c[1]];
     case 'htft': { const u=c[1].split('/'), S={'1':hn,'X':'Empate','2':an}; return 'Descanso/Final · '+S[u[0]]+' / '+S[u[1]]; }
-    case 'ln': return ({goals:'Goles',shots:'Remates',sot:'Tiros a puerta',corners:'Córners',cards:'Tarjetas',htg:'Goles 1T'}[c[1]]||c[1])+' '+({total:'partido',home:hn,away:an}[c[2]]||'')+' · '+(c[3]==='o'?'Más de ':'Menos de ')+c[4];
+    case 'ln': return ({goals:'Goles',shots:'Remates',sot:'Tiros a puerta',corners:'Córners',cards:'Tarjetas',htg:'Goles 1T',h2g:'Goles 2T'}[c[1]]||c[1])+' '+({total:'partido',home:hn,away:an}[c[2]]||'')+' · '+(c[3]==='o'?'Más de ':'Menos de ')+c[4];
   }
   return code;
 }
@@ -653,7 +679,7 @@ function codeLabel(code,hn,an){
 function compProfiles(history, th){ const C={};
   for(const x of history){ if(!x.actual||!x.inputs.comp) continue; const k=teamKey(x.inputs.comp); if(!k) continue;
     const c=C[k]||(C[k]={name:x.inputs.comp,n:0,g:0,l:0,ok:0,rn:0}), p=lambdas(x.inputs,th||THETA0), a=x.actual;
-    c.n++; c.g+=a.h+a.a; c.l+=p.lh+p.la;
+    const w=wAge(x); c.n++; c.g+=w*(a.h+a.a); c.l+=w*(p.lh+p.la);
     if(x.robot){ c.rn++; if(pick3(x.robot)===(a.h>a.a?'1':a.h===a.a?'X':'2')) c.ok++; } }
   for(const k in C) C[k].f=clamp((12+C[k].g)/(12+C[k].l),0.85,1.18);
   return C; }
@@ -665,26 +691,38 @@ function betStats(history){ const s={n:0,won:0,lost:0,voided:0,pending:0,staked:
     if(r==='win'){ s.won++; s.profit+=b.s*(b.o-1); } else { s.lost++; s.profit-=b.s; } }
   return s; }
 function learnAll(state){
+  NOW=Date.now();
   // Orden: 1) ponderaciones generales, 2) lo que aún sobra por competición, 3) lo que aún sobra por equipo.
   state.theta=train(state.history); state.cal=calibrate(state.history);
   state.comp=compProfiles(state.history,state.theta);
-  state.prof=teamProfiles(state.history,state.cal.ht,state.theta,state.comp); }
+  state.prof=teamProfiles(state.history,state.cal.ht,state.theta,state.comp,state.cal); }
 /* Memoria por equipo: compara lo que cada equipo hizo con lo que el modelo proyectaba, con freno para pocos partidos */
 const teamKey=n=>String(n||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
-function teamProfiles(history, gShare, th, comp){
-  const P={}, g=t=>{ const k=teamKey(t.name); return P[k]||(P[k]={name:t.name,n:0,gf:0,lf:0,ga:0,la:0,hg:0,fg:0,ok:0,rn:0}); };
-  for(const x of history){ if(!x.actual) continue; const p=lambdas(x.inputs,th||THETA0), H=g(x.inputs.home), A=g(x.inputs.away), a=x.actual;
+const STATK={shots:40,sot:14,corners:16,cards:7};   // freno: equivale a unos 3 partidos promedio de cada estadística
+function teamProfiles(history, gShare, th, comp, cal){
+  const P={}, g=t=>{ const k=teamKey(t.name); return P[k]||(P[k]={name:t.name,n:0,gf:0,lf:0,ga:0,la:0,f1:0,ft:0,a1:0,at:0,ok:0,rn:0,sf:{},sa:{}}); };
+  const bump=(o,st,act,pred,w)=>{ const z=o[st]||(o[st]={a:0,p:0}); z.a+=w*act; z.p+=w*pred; };
+  for(const x of history){ if(!x.actual) continue; const p=lambdas(x.inputs,th||THETA0), H=g(x.inputs.home), A=g(x.inputs.away), a=x.actual, w=wAge(x);
     const c=comp&&x.inputs.comp?comp[teamKey(x.inputs.comp)]:null; if(c){ p.lh*=c.f; p.la*=c.f; }
-    H.n++; A.n++; H.gf+=a.h; H.lf+=p.lh; H.ga+=a.a; H.la+=p.la; A.gf+=a.a; A.lf+=p.la; A.ga+=a.h; A.la+=p.lh;
-    if(a.ht) for(const T of [H,A]){ T.hg+=a.ht[0]+a.ht[1]; T.fg+=a.h+a.a; }
+    H.n++; A.n++; H.gf+=w*a.h; H.lf+=w*p.lh; H.ga+=w*a.a; H.la+=w*p.la; A.gf+=w*a.a; A.lf+=w*p.la; A.ga+=w*a.h; A.la+=w*p.lh;
+    // goles propios y recibidos en el primer tiempo
+    if(a.ht){ H.f1+=w*a.ht[0]; H.ft+=w*a.h; H.a1+=w*a.ht[1]; H.at+=w*a.a; A.f1+=w*a.ht[1]; A.ft+=w*a.a; A.a1+=w*a.ht[0]; A.at+=w*a.h; }
+    // remates, tiros a puerta, córners y tarjetas: lo que genera y lo que concede frente a lo proyectado
+    for(const st in STATK){ const v=a[st]; if(!v) continue; const mu=statMeans(x.inputs,p,st,cal);
+      bump(H.sf,st,v[0],mu.home,w); bump(H.sa,st,v[1],mu.away,w); bump(A.sf,st,v[1],mu.away,w); bump(A.sa,st,v[0],mu.home,w); }
     if(x.robot){ const ok=pick3(x.robot)===(a.h>a.a?'1':a.h===a.a?'X':'2'); for(const T of [H,A]){ T.rn++; if(ok) T.ok++; } } }
+  const gs=gShare||0.45;
   for(const k in P){ const T=P[k];
     T.att=clamp((8+T.gf)/(8+T.lf),0.85,1.18); T.def=clamp((8+T.ga)/(8+T.la),0.85,1.18);
-    T.ht=clamp(((gShare||0.45)*10+T.hg)/(10+T.fg),0.30,0.60); }
+    T.s1f=clamp((gs*6+T.f1)/(6+T.ft),0.25,0.65); T.s1a=clamp((gs*6+T.a1)/(6+T.at),0.25,0.65);
+    T.cf={}; T.ca={};
+    for(const st in STATK){ const f=T.sf[st], c=T.sa[st], K=STATK[st];
+      T.cf[st]=f?clamp((K+f.a)/(K+f.p),0.8,1.25):1; T.ca[st]=c?clamp((K+c.a)/(K+c.p),0.8,1.25):1; } }
   return P;
 }
-const PICKNAMES={goals:'Goles',shots:'Remates',sot:'Tiros a puerta',corners:'Córners',cards:'Tarjetas',htg:'Goles 1er tiempo',htr:'Resultado 1er tiempo'};
+const PICKNAMES={goals:'Goles',shots:'Remates',sot:'Tiros a puerta',corners:'Córners',cards:'Tarjetas',htg:'Goles 1er tiempo',h2g:'Goles 2º tiempo',htr:'Resultado 1er tiempo'};
 function pickHit(pk,actual){
+  if(pk.st==='h2g'){ const t=actual.ht; if(!t) return null; return (actual.h+actual.a-t[0]-t[1]>pk.l)===!!pk.o; }
   if(pk.st==='htg'||pk.st==='htr'){ const t=actual.ht; if(!t) return null;
     return pk.st==='htr' ? (t[0]>t[1]?'1':t[0]===t[1]?'X':'2')===pk.r : (t[0]+t[1]>pk.l)===!!pk.o; }
   const v=pk.st==='goals'?[actual.h,actual.a]:actual[pk.st]; if(!v) return null;
@@ -695,10 +733,11 @@ function lineRecord(history){ const out={}; for(const st in PICKNAMES) out[st]={
   return out; }
 function pick3(p){ return p.p1>=p.px&&p.p1>=p.p2 ? '1' : p.p2>=p.px ? '2' : 'X'; }
 function record(history){
-  const done=history.filter(x=>x.actual&&x.robot&&x.base); let rOk=0,bOk=0,rB=0,bB=0,ou=0,bt=0;
+  const done=history.filter(x=>x.actual&&x.robot&&x.base); let rOk=0,bOk=0,rB=0,bB=0,ou=0,bt=0,rL=0,bL=0;
+  const lg=(p,res)=>-Math.log(Math.max({'1':p.p1,X:p.px,'2':p.p2}[res],1e-6));
   for(const x of done){
     const res=x.actual.h>x.actual.a?'1':x.actual.h===x.actual.a?'X':'2';
-    if(pick3(x.robot)===res) rOk++; if(pick3(x.base)===res) bOk++;
+    if(pick3(x.robot)===res) rOk++; if(pick3(x.base)===res) bOk++; rL+=lg(x.robot,res); bL+=lg(x.base,res);
     const y={1:[1,0,0],X:[0,1,0],2:[0,0,1]}[res];
     const br=p=>Math.pow(p.p1-y[0],2)+Math.pow(p.px-y[1],2)+Math.pow(p.p2-y[2],2);
     rB+=br(x.robot); bB+=br(x.base);
@@ -706,10 +745,13 @@ function record(history){
     if((x.base.btts>=0.5)===(x.actual.h>0&&x.actual.a>0)) bt++;
   }
   const n=done.length;
-  return {n, rAcc:n?rOk/n:0, bAcc:n?bOk/n:0, rBrier:n?rB/n:0, bBrier:n?bB/n:0, ou:n?ou/n:0, btts:n?bt/n:0};
+  return {n, rAcc:n?rOk/n:0, bAcc:n?bOk/n:0, rBrier:n?rB/n:0, bBrier:n?bB/n:0, rLog:n?rL/n:0, bLog:n?bL/n:0, ou:n?ou/n:0, btts:n?bt/n:0};
 }
 /*END*/
 const HIST_MAX=1800;
+const localDate=d=>{ const z=d||new Date(); return z.getFullYear()+'-'+String(z.getMonth()+1).padStart(2,'0')+'-'+String(z.getDate()).padStart(2,'0'); };
+// Partidos analizados en el día: se conservan 48 horas
+const freshToday=l=>(Array.isArray(l)?l:[]).filter(d=>d&&d.id&&d.inputs&&d.inputs.home&&d.inputs.away&&Date.now()-(d.ts||0)<48*3600*1000).slice(0,40);
 
 /* ---------- Formulario ---------- */
 const RES=[['wins','Partidos ganados'],['btts','Ambos equipos marcaron'],['over25','Más de 2.5 goles'],['scoredFirst','Marcó primero'],['concededFirst','Recibió gol primero'],['unbeaten','Empató o Ganó'],['htWin','Vencedor al entretiempo'],['cleanSheet','Valla invicta']];
@@ -830,11 +872,11 @@ const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 function sanitize(s){ if(!s||typeof s!=='object'||!Array.isArray(s.history)) return null;
   const hist=s.history.filter(x=>x&&x.inputs&&x.inputs.home&&x.inputs.away).slice(0,HIST_MAX);
   const seen=new Set(); for(const x of hist){ if(!/^[A-Za-z0-9_-]{1,60}$/.test(x.id||'')||seen.has(x.id)) x.id=newId(); seen.add(x.id); }
-  return {v:1,theta:Object.assign({},THETA0),history:hist,updatedAt:Number(s.updatedAt)||0}; }
+  return {v:1,theta:Object.assign({},THETA0),history:hist,today:freshToday(s.today),updatedAt:Number(s.updatedAt)||0}; }
 function setSync(t,cls){ const p=$('syncPill'); p.textContent=t; p.className='pill '+(cls||''); }
 function persist(){
   state.updatedAt=Date.now();
-  let local=false; try{ localStorage.setItem(LS,JSON.stringify({v:1,history:state.history,updatedAt:state.updatedAt})); local=true; }catch(e){}
+  let local=false; try{ localStorage.setItem(LS,JSON.stringify({v:1,history:state.history,today:state.today||[],updatedAt:state.updatedAt})); local=true; }catch(e){}
   if(!CS){ setSync(inTg?'Actualiza Telegram para guardar en la nube':local?'Memoria en este dispositivo':'Memoria solo en esta sesión', local&&!inTg?'':'bad'); return; }
   if(!cloudReady) return;
   // Cada clave de Telegram admite 4096 caracteres: los partidos se agrupan en "cubetas" de a dos o tres por clave
@@ -849,6 +891,7 @@ function persist(){
     const j=JSON.stringify(x); if(j.length>LIM-2){ delete x.k; skipped++; continue; }
     B.get(x.k).push(j); }
   const want=new Map(); for(const [k,arr] of B) if(arr.length) want.set('b_'+k,'['+arr.join(',')+']');
+  for(const d of freshToday(state.today)){ const j=JSON.stringify(d); if(j.length<=LIM) want.set('d_'+d.id,j); }   // partidos de hoy
   const sets=[...want].filter(([k,v])=>cloud.get(k)!==v), dels=[...cloud.keys()].filter(k=>!want.has(k));
   if(!sets.length&&!dels.length){ setSync('Guardado en Telegram','good'); return; }
   setSync('Guardando en Telegram');
@@ -867,15 +910,17 @@ async function loadMemory(){
   setSync('Cargando desde Telegram');
   try{
     const all=await Promise.race([csCall('getKeys'), new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),12000))]);
-    const keys=(all||[]).filter(k=>k.indexOf('b_')===0||k.indexOf('m_')===0), remote=[], seen=new Set();
+    const keys=(all||[]).filter(k=>k.indexOf('b_')===0||k.indexOf('m_')===0||k.indexOf('d_')===0), remote=[], seen=new Set(), days=[]; let hadDays=false;
     const take=(x,k)=>{ if(!x||!x.inputs||!x.inputs.home||!x.inputs.away||!x.id||seen.has(x.id)) return; seen.add(x.id); if(k===null) delete x.k; else x.k=k; remote.push(x); };
     for(let i=0;i<keys.length;i+=40){ const vals=await csCall('getItems',keys.slice(i,i+40));
       for(const key in vals){ if(!vals[key]) continue; cloud.set(key,vals[key]);
         try{ const v=JSON.parse(vals[key]);
-          if(key[0]==='b'){ const k=Number(key.slice(2)); (Array.isArray(v)?v:[]).forEach(x=>take(x,k)); }
+          if(key[0]==='d'){ hadDays=true; days.push(v); }
+          else if(key[0]==='b'){ const k=Number(key.slice(2)); (Array.isArray(v)?v:[]).forEach(x=>take(x,k)); }
           else { v.id=key.slice(2); take(v,null); }   // formato antiguo: un partido por clave
         }catch(e){} } }
     // Telegram manda. Lo guardado solo en este dispositivo se sube únicamente si la nube está vacía.
+    if(hadDays) state.today=freshToday(days).sort((p,q)=>q.ts-p.ts);
     if(remote.length){ remote.sort((p,q)=>(q.ts||0)-(p.ts||0)); state.history=remote.slice(0,HIST_MAX); }
     else state.history.forEach(x=>{ delete x.k; });
     relearn(); cloudReady=true; persist(); renderRobot(); if(current) analyze(current.m);
@@ -978,6 +1023,9 @@ function robotOpinion(m,b,r){
   if(og||bt) s.push(`En goles me gusta ${[og,bt].filter(Boolean).join(' y ')}.`); else s.push('En los mercados de goles no veo una ventaja clara; los dejaría pasar.');
   { const hp=[['victoria de '+h.name,r.ht1],['empate',r.htx],['victoria de '+a.name,r.ht2]].sort((x,y)=>y[1]-x[1])[0], g1=countOver((r.lh+r.la)*r.htShare,1,0.5);
     s.push(`Para el primer tiempo veo ${esc(hp[0])} al descanso (${pc(hp[1])}) y un ${pc(g1)} de que haya al menos un gol antes del entretiempo.`); }
+    s.push(`Reparto los goles así: ${f2(r.h1.total)} en el primer tiempo y ${f2(r.h2.total)} en el segundo, con un ${pc(countOver(r.h2.total,1,0.5))} de que haya gol después del descanso.`);
+    for(const [t,T] of known){ if(T.ft>=4&&Math.abs(T.s1f-0.45)>=0.08) s.push(`${esc(t.name)} marca el ${pc(T.s1f>0.45?T.s1f:1-T.s1f)} de sus goles en el ${T.s1f>0.45?'primer':'segundo'} tiempo, según lo que he registrado.`); }
+    if(r.mkt) s.push(`Tomé en cuenta las cuotas de tu casa con un peso de ${pc(state.theta.wMkt)}: suelen reflejar bajas y alineaciones que estos datos no traen.`);
   for(const [t,T] of known){ const d=(v,up,dn)=>v>1.03?`${up} (×${f2(v)})`:v<0.97?`${dn} (×${f2(v)})`:null;
     const bits=[d(T.att,'marca más de lo que proyecta el modelo','marca menos de lo que proyecta el modelo'),d(T.def,'recibe más de lo proyectado','recibe menos de lo proyectado')].filter(Boolean);
     s.push(`Ya conozco a ${esc(t.name)} de ${T.n} partido${T.n>1?'s':''}: ${bits.length?bits.join(' y '):'rinde como proyecta el modelo'}.`+(T.rn?` Con este equipo acerté ${T.ok} de ${T.rn}.`:'')); }
@@ -997,10 +1045,14 @@ function analyze(m){
   const P=state.prof||{}, pH=P[teamKey(m.home.name)], pA=P[teamKey(m.away.name)];
   const adj={h:Math.sqrt((pH?pH.att:1)*(pA?pA.def:1)), a:Math.sqrt((pA?pA.att:1)*(pH?pH.def:1))};
   const pC=(state.comp||{})[teamKey(m.comp||'')]; if(pC){ adj.h*=pC.f; adj.a*=pC.f; }
-  const r=robotView(m,state.theta,((pH?pH.ht:share)+(pA?pA.ht:share))/2,adj);
-  const picks=robotPicks(m,r,state.cal);
+  // Reparto por tiempos de cada equipo: lo que marca en el 1T y lo que el rival recibe en el 1T
+  const sh={h:((pH?pH.s1f:share)+(pA?pA.s1a:share))/2, a:((pA?pA.s1f:share)+(pH?pH.s1a:share))/2};
+  const r=robotView(m,state.theta,sh,adj);
+  const mcal=Object.assign({},state.cal,{team:{}});
+  for(const st in STATK) mcal.team[st]={h:Math.sqrt((pH?pH.cf[st]:1)*(pA?pA.ca[st]:1)), a:Math.sqrt((pA?pA.cf[st]:1)*(pH?pH.ca[st]:1))};
+  const picks=robotPicks(m,r,mcal);
   const xb=extraMarkets(b), xr=extraMarkets(r);
-  current={m,b,r,picks,pH,pA,pC,xb,xr,bets:prev?prev.bets:[],savedId:prev?prev.savedId:null};
+  current={m,b,r,picks,pH,pA,pC,xb,xr,cal:mcal,bets:prev?prev.bets:[],savedId:prev?prev.savedId:null};
   const h=m.home,a=m.away,hn=esc(h.name),an=esc(a.name), S=summary(m,b), [q1,qx,q2]=round3(b), t=b.top[0];
   const maxP=b.top[0].p, cells=[];
   for(let i=0;i<=5;i++){ let row=`<tr><th>${i}</th>`; for(let j=0;j<=5;j++){ const v=b.M[i][j]; const col=i>j?'76,194,255':i<j?'255,138,92':'147,163,181';
@@ -1059,7 +1111,7 @@ function analyze(m){
 
   <div class="card" data-pane="lineas"><div class="head"><h2>Líneas</h2>
       <div class="seg" id="lineSide"><button type="button" class="mini" data-side="over">Más de</button><button type="button" class="mini" data-side="under">Menos de</button><button type="button" class="mini" data-side="odds">Cuota justa</button></div></div>
-    <div class="tabs" role="tablist" id="lineTabs">${STATS.map(([k,l])=>`<button type="button" role="tab" class="tab" data-tab="${k}">${l}</button>`).join('')}<button type="button" role="tab" class="tab" data-tab="ht">1er tiempo</button></div>
+    <div class="tabs" role="tablist" id="lineTabs">${STATS.map(([k,l])=>`<button type="button" role="tab" class="tab" data-tab="${k}">${l}</button>`).join('')}<button type="button" role="tab" class="tab" data-tab="ht">1er tiempo</button><button type="button" role="tab" class="tab" data-tab="h2">2º tiempo</button></div>
     <div id="lineBody"></div>
     <p class="small muted">Toca cualquier porcentaje para llevar esa jugada a tus apuestas. El rango de líneas se ajusta a la proyección de este partido. En verde, 62% o más. Remates, tiros a puerta, córners y tarjetas parten del promedio propio de cada equipo, así que son menos precisas que las de goles.</p></div>
 
@@ -1133,7 +1185,7 @@ function analyze(m){
 }
 function gotoBet(code){
   const sel=$('bet_mkt'), hn=esc(current.m.home.name), an=esc(current.m.away.name);
-  if(![...sel.options].some(o=>o.value===code)){ const o=document.createElement('option'); o.value=code; o.innerHTML=codeLabel(code,hn,an)+' ('+pc(marketProb(code,current.m,current.r,current.xr,state.cal))+')'; sel.insertBefore(o,sel.firstChild); }
+  if(![...sel.options].some(o=>o.value===code)){ const o=document.createElement('option'); o.value=code; o.innerHTML=codeLabel(code,hn,an)+' ('+pc(marketProb(code,current.m,current.r,current.xr,current.cal))+')'; sel.insertBefore(o,sel.firstChild); }
   sel.value=code; setTab('robot'); sel.dispatchEvent(new Event('input',{bubbles:true}));
   setTimeout(()=>{ document.querySelector('.betbox').scrollIntoView({block:'center'}); $('bet_odd').focus(); },60); haptic();
 }
@@ -1156,7 +1208,7 @@ function verdict(m,r,picks,xr){
   return {bet:c[0].p>=thr,best:c[0],list:c.filter(z=>z.p>=thr).slice(0,3),thr,strict,n,ok};
 }
 function betOptions(hn,an){
-  const {m,r,xr,picks}=current, P=c=>marketProb(c,m,r,xr,state.cal), O=c=>`<option value="${c}">${codeLabel(c,hn,an)} (${pc(P(c))})</option>`;
+  const {m,r,xr,picks}=current, P=c=>marketProb(c,m,r,xr,current.cal), O=c=>`<option value="${c}">${codeLabel(c,hn,an)} (${pc(P(c))})</option>`;
   const G=(t,codes)=>`<optgroup label="${t}">${codes.map(O).join('')}</optgroup>`;
   return G('Jugadas del robot',picks.map(pickCode))
     +G('Resultado',['ft:1','ft:X','ft:2','dc:1X','dc:X2','dc:12','dnb:1','dnb:2'])
@@ -1173,7 +1225,7 @@ function wireBets(){
   const {m,r,xr}=current, hn=esc(m.home.name), an=esc(m.away.name);
   const info=()=>{ document.querySelectorAll('.betbox .cst').forEach(e=>e.hidden=$('bet_mkt').value!=='custom');
     const c=betCode(), out=$('bet_info'); if(!c){ out.textContent='Ingresa una línea válida, por ejemplo 9.5.'; return null; }
-    const p=marketProb(c,m,r,xr,state.cal), o=val('bet_odd'); let t=`Probabilidad según el robot: <b>${pc(p)}</b> · cuota justa <b>${fair(p)}</b>.`;
+    const p=marketProb(c,m,r,xr,current.cal), o=val('bet_odd'); let t=`Probabilidad según el robot: <b>${pc(p)}</b> · cuota justa <b>${fair(p)}</b>.`;
     const soft=/^ln:(shots|sot|corners|cards):/.test(c);
     if(o>1){ const ev=p*o-1, k=Math.min(soft?0.015:0.03,Math.max(0,ev/(o-1))/4);
       t+=ev>=0.05?` Con cuota ${f2(o)} el retorno esperado es <b style="color:var(--good)">+${Math.round(ev*100)}%</b>. Monto sugerido: ${(k*100).toFixed(1)}% de tu banca como máximo.${soft?' Esta línea parte solo de promedios propios de cada equipo: toma la ventaja con cautela.':''}`
@@ -1190,27 +1242,29 @@ function wireBets(){
   if(current.savedId&&state.history.some(z=>z.id===current.savedId)){ $('btnSave').disabled=true; $('saveMsg').textContent='Pronóstico guardado. Las apuestas que agregues se guardan solas.'; }
 }
 function renderLines(){
-  if(!current||!$('lineBody')) return; const {m,b}=current, st=lineTab, ht=st==='ht', hn=esc(m.home.name), an=esc(m.away.name);
-  const mu=ht?{home:b.lh*b.htShare,away:b.la*b.htShare,total:(b.lh+b.la)*b.htShare}:statMeans(m,b,st,state.cal);
+  if(!current||!$('lineBody')) return; const {m,b}=current, st=lineTab, ht=st==='ht'||st==='h2', hs=st==='ht'?'htg':'h2g', hn=esc(m.home.name), an=esc(m.away.name);
+  const mu=ht?b[st==='ht'?'h1':'h2']:statMeans(m,b,st,current.cal);
   document.querySelectorAll('#lineTabs .tab').forEach(t=>{ const on=t.dataset.tab===st; t.classList.toggle('on',on); t.setAttribute('aria-selected',on?'true':'false'); });
   document.querySelectorAll('#lineSide button').forEach(t=>t.classList.toggle('on',t.dataset.side==='odds'?lineOdds:t.dataset.side===lineSide));
-  const cell=(p,sc,ln)=>{ const v=lineSide==='over'?p:1-p; return `<td class="tap" data-code="ln:${ht?'htg':st}:${sc}:${lineSide==='over'?'o':'u'}:${ln}" style="${v>=0.97||v<=0.03?'color:var(--muted)':v>=0.62?'color:var(--good);font-weight:600':''}">${lineOdds?fair(v):pc(v)}</td>`; };
-  const k=!ht&&st!=='goals'&&state.cal?state.cal[st]:1, word=lineSide==='over'?'Más de':'Menos de', name=ht?'Goles 1T':STATS.find(z=>z[0]===st)[1];
-  const rows=ht?[0.5,1.5,2.5].concat(mu.total>1.8?[3.5]:[]):lineRows(mu,st), over=(sc,ln)=>ht?countOver(mu[sc],1,ln):lineOver(m,b,st,sc,ln,state.cal);
+  const cell=(p,sc,ln)=>{ const v=lineSide==='over'?p:1-p; return `<td class="tap" data-code="ln:${ht?hs:st}:${sc}:${lineSide==='over'?'o':'u'}:${ln}" style="${v>=0.97||v<=0.03?'color:var(--muted)':v>=0.62?'color:var(--good);font-weight:600':''}">${lineOdds?fair(v):pc(v)}</td>`; };
+  const k=!ht&&st!=='goals'&&state.cal?state.cal[st]:1, word=lineSide==='over'?'Más de':'Menos de', name=ht?(st==='ht'?'Goles 1T':'Goles 2T'):STATS.find(z=>z[0]===st)[1];
+  const rows=ht?[0.5,1.5,2.5].concat(mu.total>1.8?[3.5]:[]):lineRows(mu,st), over=(sc,ln)=>ht?countOver(mu[sc],1,ln):lineOver(m,b,st,sc,ln,current.cal);
   $('lineBody').innerHTML=`<div class="tablewrap"><table class="plain ltab"><thead><tr><th>Línea</th><th>${name} partido<div>Proy. ${f2(mu.total)}</div></th><th class="hc">${hn}<div>Proy. ${f2(mu.home)}</div></th><th class="ac">${an}<div>Proy. ${f2(mu.away)}</div></th></tr></thead><tbody>${
     rows.map(ln=>`<tr><td>${word} ${ln.toFixed(1)}</td>${cell(over('total',ln),'total',ln)}${cell(over('home',ln),'home',ln)}${cell(over('away',ln),'away',ln)}</tr>`).join('')}</tbody></table></div>`
-    +(ht?`<div class="bars" style="margin-top:14px"><h3>Resultado al descanso</h3>${barRow('Gana '+hn,b.ht1,'var(--home)')}${barRow('Empate',b.htx)}${barRow('Gana '+an,b.ht2,'var(--away)')}</div><p class="small muted" style="margin-top:8px">El robot estima que el ${pc(b.htShare)} de los goles cae en el primer tiempo${Math.abs(b.htShare-0.45)>0.004?', ajustado con los descansos que registraste':''}.</p>`:'')
+    +(st==='h2'?`<p class="small muted" style="margin-top:8px">Goles que se marcan solo en el segundo tiempo. Para cerrar estas apuestas registra los goles del primer tiempo en el resultado.</p>`:'')
+    +(st==='ht'?`<div class="bars" style="margin-top:14px"><h3>Resultado al descanso</h3>${barRow('Gana '+hn,b.ht1,'var(--home)')}${barRow('Empate',b.htx)}${barRow('Gana '+an,b.ht2,'var(--away)')}</div><p class="small muted" style="margin-top:8px">El robot estima que el ${pc(b.htShare)} de los goles cae en el primer tiempo${Math.abs(b.htShare-0.45)>0.004?', ajustado con los descansos que registraste':''}.</p>`:'')
     +(Math.abs(k-1)>0.005?`<p class="small muted" style="margin-top:8px">Proyección ajustada por el robot ×${f2(k)} según los partidos que registraste.</p>`:'');
 }
 $('form').addEventListener('submit',e=>{ e.preventDefault(); const m=readForm();
   if(!m){ $('errors').scrollIntoView({block:'center',behavior:'smooth'}); return; }
-  analyze(m); setTab('analisis'); });
+  analyze(m); saveDraft(m); setTab('analisis'); });
 
 function slim(p){ const r=x=>Math.round(x*1e4)/1e4; return {p1:r(p.p1),px:r(p.px),p2:r(p.p2),o25:r(p.o25),btts:r(p.btts)}; }
 function savePrediction(){
   if(!current) return; const {m,b,r,picks}=current, nid=newId();
   current.savedId=nid;
-  state.history.unshift({picks,bets:current.bets,ts:Date.now(),id:nid,date:new Date().toISOString().slice(0,10),
+  { const d=findDraft(m); if(d) d.savedId=nid; }
+  state.history.unshift({picks,bets:current.bets,ts:Date.now(),id:nid,date:localDate(),
     inputs:JSON.parse(JSON.stringify(m)),base:slim(b),robot:slim(r),score:b.top[0].h+'-'+b.top[0].a,actual:null});
   state.history=state.history.slice(0,HIST_MAX); persist(); renderRobot();
   toast('Pronóstico guardado en el historial');
@@ -1218,7 +1272,7 @@ function savePrediction(){
 }
 
 /* ---------- Panel del robot ---------- */
-const PNAMES={wXG:['Peso del xG frente a los goles reales',x=>pc(x)],homeAdv:['Ventaja de localía',x=>'×'+f2(x)],rankK:['Peso del ranking',f2],formK:['Peso de los puntos por partido',f2],goalScale:['Escala general de goles',x=>'×'+f2(x)],sharp:['Seguridad de sus probabilidades',x=>'×'+f2(x)],wEmp:['Peso del historial de resultados',x=>pc(x)],wForm:['Peso de la forma reciente (últimos 5)',x=>pc(x)]};
+const PNAMES={wXG:['Peso del xG frente a los goles reales',x=>pc(x)],homeAdv:['Ventaja de localía',x=>'×'+f2(x)],rankK:['Peso del ranking',f2],formK:['Peso de los puntos por partido',f2],goalScale:['Escala general de goles',x=>'×'+f2(x)],wMkt:['Peso de las cuotas de la casa',x=>pc(x)],sharp:['Seguridad de sus probabilidades',x=>'×'+f2(x)],wEmp:['Peso del historial de resultados',x=>pc(x)],wForm:['Peso de la forma reciente (últimos 5)',x=>pc(x)]};
 function renderRobot(){
   const rec=record(state.history), n=rec.n, pend=state.history.filter(x=>!x.actual).length;
   const lvl=n>=50?'Experto':n>=20?'Analista':n>=5?'Aprendiz':'Novato';
@@ -1232,8 +1286,8 @@ function renderRobot(){
     Object.keys(PICKNAMES).map(k=>{ const l=PICKNAMES[k], isHt=k==='htg'||k==='htr', c=isHt?(cal.ht||0.45):(cal[k]||1), ch=isHt?Math.abs(c-0.45)>0.004:(k!=='goals'&&Math.abs(c-1)>0.005);
       return `<tr><td>${l}</td><td>${lr[k].n?lr[k].ok+' de '+lr[k].n:'<span class="muted">Sin datos</span>'}</td><td style="${ch?'color:var(--accent);font-weight:600':''}">${k==='goals'?'<span class="muted">Usa el modelo de goles</span>':isHt?pc(c)+' de los goles en el 1T':'×'+f2(c)}</td></tr>`; }).join('')}</tbody></table></div>`;
   const teams=Object.values(state.prof||{}).sort((x,y)=>y.n-x.n).slice(0,40);
-  if(teams.length) h+=`<div class="tablewrap" style="margin-top:12px"><table class="plain"><thead><tr><th>Equipos que conozco</th><th>Partidos</th><th>Ataque</th><th>Goles recibidos</th><th>Goles en 1T</th><th>Aciertos</th></tr></thead><tbody>${
-    teams.map(T=>`<tr><td>${esc(T.name)}</td><td>${T.n}</td><td>×${f2(T.att)}</td><td>×${f2(T.def)}</td><td>${pc(T.ht)}</td><td>${T.rn?T.ok+' de '+T.rn:''}</td></tr>`).join('')}</tbody></table></div><p class="small muted">Ataque y goles recibidos comparan lo que hizo cada equipo con lo que proyectaba el modelo (×1.00 es igual a lo proyectado). Con pocos partidos el ajuste es pequeño a propósito.</p>`;
+  if(teams.length) h+=`<div class="tablewrap" style="margin-top:12px"><table class="plain"><thead><tr><th>Equipos que conozco</th><th>Partidos</th><th>Ataque</th><th>Goles recibidos</th><th>1T: marca / recibe</th><th>Córners: genera / concede</th><th>Aciertos</th></tr></thead><tbody>${
+    teams.map(T=>`<tr><td>${esc(T.name)}</td><td>${T.n}</td><td>×${f2(T.att)}</td><td>×${f2(T.def)}</td><td>${pc(T.s1f)} / ${pc(T.s1a)}</td><td>×${f2(T.cf.corners)} / ×${f2(T.ca.corners)}</td><td>${T.rn?T.ok+' de '+T.rn:''}</td></tr>`).join('')}</tbody></table></div><p class="small muted">Ataque y goles recibidos comparan lo que hizo cada equipo con lo que proyectaba el modelo (×1.00 es igual a lo proyectado). Con pocos partidos el ajuste es pequeño a propósito.</p>`;
   const comps=Object.values(state.comp||{}).sort((x,y)=>y.n-x.n).slice(0,30);
   if(comps.length) h+=`<div class="tablewrap" style="margin-top:12px"><table class="plain"><thead><tr><th>Competiciones que conozco</th><th>Partidos</th><th>Goles frente a lo proyectado</th><th>Aciertos</th></tr></thead><tbody>${
     comps.map(c=>`<tr><td>${esc(c.name)}</td><td>${c.n}</td><td>×${f2(c.f)}</td><td>${c.rn?c.ok+' de '+c.rn:''}</td></tr>`).join('')}</tbody></table></div>`;
@@ -1244,8 +1298,43 @@ function renderRobot(){
   $('robotStats').innerHTML=h;
   $('histBadge').hidden=!pend; $('histBadge').textContent=pend;
   renderRvm();
+  renderToday();
   renderHistory();
 }
+/* ---------- Partidos de hoy ---------- */
+const matchKey=m=>teamKey(m.home.name)+'|'+teamKey(m.away.name);
+function findDraft(m){ const k=matchKey(m), day=localDate(); return (state.today||[]).find(d=>matchKey(d.inputs)===k&&localDate(new Date(d.ts))===day); }
+function saveDraft(m){
+  state.today=freshToday(state.today); const d=findDraft(m), inputs=JSON.parse(JSON.stringify(m));
+  if(d){ d.inputs=inputs; d.ts=Date.now(); state.today.sort((p,q)=>q.ts-p.ts); }
+  else state.today.unshift({id:'d'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),ts:Date.now(),inputs});
+  state.today=state.today.slice(0,40); persist(); renderToday();
+}
+function renderToday(){
+  const box=$('today'), list=freshToday(state.today), day=localDate();
+  const mine=list.filter(d=>localDate(new Date(d.ts))===day);
+  $('hoyCount').textContent=mine.length?mine.length+' analizado'+(mine.length===1?'':'s')+' hoy':'';
+  if(!list.length){ box.innerHTML='<p class="muted small">Todavía no analizas partidos hoy. Ingresa los datos en la pestaña Partido y pulsa "Analizar partido": quedará guardado aquí automáticamente.</p>'; return; }
+  const item=d=>{ const m=d.inputs, hn=esc(m.home.name), an=esc(m.away.name), p=predict(m,THETA0), q=round3(p), t=p.top[0], tm=new Date(d.ts);
+    const saved=d.savedId&&state.history.find(x=>x.id===d.savedId);
+    return `<div class="h-item"><div><div class="t">${hn} vs ${an}</div>
+      <div class="small muted">${String(tm.getHours()).padStart(2,'0')}:${String(tm.getMinutes()).padStart(2,'0')}${m.comp?' · '+esc(m.comp):''} · ${q[0]}% / ${q[1]}% / ${q[2]}% · marcador ${t.h}–${t.a}</div></div>
+      <div class="ctl">${saved?`<span class="pill good">${saved.actual?'Con resultado':'Pronóstico guardado'}</span>`:''}<button type="button" class="mini" data-tact="open" data-id="${d.id}">Abrir análisis</button><button type="button" class="mini" data-tact="edit" data-id="${d.id}">Editar datos</button><button type="button" class="mini danger" data-tact="del" data-id="${d.id}">Quitar</button></div></div>`; };
+  const old=list.filter(d=>localDate(new Date(d.ts))!==day);
+  box.innerHTML=mine.map(item).join('')+(old.length?`<h3 style="margin-top:8px">Ayer</h3>`+old.map(item).join(''):'');
+}
+$('today').addEventListener('click',e=>{ const b=e.target.closest('button[data-tact]'); if(!b) return;
+  const i=(state.today||[]).findIndex(d=>d.id===b.dataset.id); if(i<0) return; const d=state.today[i];
+  if(b.dataset.tact==='del'){ state.today.splice(i,1); persist(); renderToday(); return; }
+  toForm(d.inputs);
+  if(b.dataset.tact==='edit'){ setTab('partido'); return; }
+  const m=readForm(); if(!m){ setTab('partido'); return; }
+  analyze(m);
+  const x=d.savedId&&state.history.find(z=>z.id===d.savedId);
+  if(x){ current.savedId=x.id; current.bets=x.bets||(x.bets=[]); analyze(current.m); }
+  setTab('analisis');
+});
+
 /* ---------- Robot vs Mercado ---------- */
 const FAMNAMES={ft:'Resultado final',dc:'Doble oportunidad',dnb:'Empate no apuesta',btts:'Ambos marcan',ah:'Hándicap',wtn:'Gana sin recibir goles',wb:'Gana y ambos marcan',odd:'Par / impar',even:'Par / impar',mg:'Margen de victoria',htr:'Resultado 1er tiempo','2h':'Goles 2º tiempo',half:'Tiempo con más goles',htft:'Descanso / Final','ln:goals':'Línea de goles','ln:htg':'Línea de goles 1T','ln:shots':'Línea de remates','ln:sot':'Línea de tiros a puerta','ln:corners':'Línea de córners','ln:cards':'Línea de tarjetas'};
 function renderRvm(){
@@ -1254,20 +1343,22 @@ function renderRvm(){
   const res=a=>a.h>a.a?'1':a.h===a.a?'X':'2', P=(a,b)=>b?Math.round(a/b*100)+'%':'—', rec=record(H), lr=lineRecord(H), bs=betStats(H);
   const fav=x=>['1','X','2'][x.inputs.odds.indexOf(Math.min.apply(null,x.inputs.odds))];
   const brier=(p,r)=>Math.pow(p[0]-(r==='1'),2)+Math.pow(p[1]-(r==='X'),2)+Math.pow(p[2]-(r==='2'),2);
-  const mk=done.filter(x=>x.inputs.odds); let mOk=0,rOk=0,mB=0,rB=0,dis=0,disOk=0;
+  const mk=done.filter(x=>x.inputs.odds); let mOk=0,rOk=0,mB=0,rB=0,dis=0,disOk=0,mL=0,rL=0;
   for(const x of mk){ const r=res(x.actual), inv=x.inputs.odds.map(o=>1/o), s=inv[0]+inv[1]+inv[2], f=fav(x), rp=pick3(x.robot);
-    if(f===r) mOk++; if(rp===r) rOk++; mB+=brier(inv.map(v=>v/s),r); rB+=brier([x.robot.p1,x.robot.px,x.robot.p2],r); if(f!==rp){ dis++; if(rp===r) disOk++; } }
+    if(f===r) mOk++; if(rp===r) rOk++; mB+=brier(inv.map(v=>v/s),r); rB+=brier([x.robot.p1,x.robot.px,x.robot.p2],r); { const i={'1':0,X:1,'2':2}[r]; mL-=Math.log(Math.max(inv[i]/s,1e-6)); rL-=Math.log(Math.max([x.robot.p1,x.robot.px,x.robot.p2][i],1e-6)); } if(f!==rp){ dis++; if(rp===r) disOk++; } }
   const few=n=>n<10?' <span class="pill">Pocos datos</span>':'';
   let h=`<div class="card"><div class="head"><h2>Robot vs Mercado</h2><span class="small muted">${done.length} partido${done.length===1?'':'s'} con resultado</span></div>
     <div class="tiles">
       <div class="tile"><span class="k">Robot acierta el resultado</span><div class="vv num"><span>${P(rec.rAcc*rec.n,rec.n)}</span></div></div>
       <div class="tile"><span class="k">Modelo base acierta</span><div class="vv num"><span>${P(rec.bAcc*rec.n,rec.n)}</span></div></div>
+      <div class="tile"><span class="k">Puntuación logarítmica robot / base</span><div class="vv num"><span>${rec.rLog.toFixed(3)}</span><span class="muted">${rec.bLog.toFixed(3)}</span></div><span class="k">Menor es mejor</span></div>
       <div class="tile"><span class="k">Favorito de la casa acierta</span><div class="vv num"><span>${mk.length?P(mOk,mk.length):'—'}</span></div><span class="k">${mk.length?mk.length+' partidos con cuotas':'Ingresa cuotas 1X2 para comparar'}</span></div>
       ${mk.length?`<div class="tile"><span class="k">Robot en esos mismos partidos</span><div class="vv num"><span>${P(rOk,mk.length)}</span></div></div>
       <div class="tile"><span class="k">Error Brier robot / casa</span><div class="vv num"><span>${(rB/mk.length).toFixed(3)}</span><span class="muted">${(mB/mk.length).toFixed(3)}</span></div><span class="k">Menor es mejor</span></div>
+      <div class="tile"><span class="k">Puntuación logarítmica robot / casa</span><div class="vv num"><span>${(rL/mk.length).toFixed(3)}</span><span class="muted">${(mL/mk.length).toFixed(3)}</span></div><span class="k">Menor es mejor</span></div>
       <div class="tile"><span class="k">Cuando no coinciden, acierta el robot</span><div class="vv num"><span>${dis?disOk+' de '+dis:'—'}</span></div></div>`:''}
     </div>
-    <p class="small muted" style="max-width:70ch">La casa de apuestas es la referencia a superar. Si el error Brier del robot no baja del de la casa, sus probabilidades no son mejores que las cuotas.</p></div>`;
+    <p class="small muted" style="max-width:70ch">La casa de apuestas es la referencia a superar. Si la puntuación logarítmica del robot no baja de la de la casa, sus probabilidades no son mejores que las cuotas. Es la medida más fiable con pocos partidos: castiga fuerte dar poca probabilidad a lo que termina ocurriendo.</p></div>`;
   // por métrica
   const M=[['Resultado 1X2',Math.round(rec.rAcc*rec.n),rec.n],['Más / Menos 2.5 goles',Math.round(rec.ou*rec.n),rec.n],['Ambos marcan',Math.round(rec.btts*rec.n),rec.n]]
     .concat(Object.keys(PICKNAMES).map(k=>['Línea: '+PICKNAMES[k],lr[k].ok,lr[k].n]));
@@ -1378,7 +1469,7 @@ function buildReport(){
   for(const k in THETA0) add(`${k}: ${THETA0[k]} -> ${r3(state.theta[k])}`);
   add('Calibración de conteos y 1T: '+JSON.stringify(Object.fromEntries(Object.entries(state.cal||{}).map(([k,v])=>[k,r3(v)]))));
   add('\n## 2. Resultado 1X2');
-  add(`n=${rec.n} · acierto robot ${P(rec.rAcc,1)} · acierto base ${P(rec.bAcc,1)} · Brier robot ${r3(rec.rBrier)} · Brier base ${r3(rec.bBrier)}`);
+  add(`n=${rec.n} · acierto robot ${P(rec.rAcc,1)} · acierto base ${P(rec.bAcc,1)} · Brier robot ${r3(rec.rBrier)} · Brier base ${r3(rec.bBrier)} · Log robot ${r3(rec.rLog)} · Log base ${r3(rec.bLog)}`);
   add(`Más/Menos 2.5 acierto ${P(rec.ou,1)} · Ambos marcan acierto ${P(rec.btts,1)}`);
   const wr=done.filter(x=>x.robot);
   if(wr.length){ const c={'1':0,X:0,'2':0}; wr.forEach(x=>c[res(x.actual)]++);
@@ -1407,7 +1498,7 @@ function buildReport(){
     const f=fam[k]||(fam[k]={n:0,w:0,s:0,p:0,pr:0,od:0}); f.n++; f.s+=b.s; f.pr+=b.p||0; f.od+=b.o; if(r==='win'){ f.w++; f.p+=b.s*(b.o-1); } else f.p-=b.s; }));
   for(const k in fam){ const f=fam[k]; add(`  ${k}: n=${f.n}, ganadas ${f.w}, prob media robot ${P(f.pr/f.n,1)}, cuota media ${r2(f.od/f.n)}, retorno ${r2(f.p/f.s*100)}%`); }
   add('\n## 7. Equipos con 3 o más partidos (ataque, goles recibidos, reparto 1T, aciertos)');
-  Object.values(state.prof||{}).filter(T=>T.n>=3).sort((u,v)=>v.n-u.n).slice(0,80).forEach(T=>add(`  ${T.name}: n=${T.n} · x${r2(T.att)} · x${r2(T.def)} · ${P(T.ht,1)} · ${T.ok}/${T.rn}`));
+  Object.values(state.prof||{}).filter(T=>T.n>=3).sort((u,v)=>v.n-u.n).slice(0,80).forEach(T=>add(`  ${T.name}: n=${T.n} · x${r2(T.att)} · x${r2(T.def)} · 1T marca ${P(T.s1f,1)} recibe ${P(T.s1a,1)} · córners x${r2(T.cf.corners)}/x${r2(T.ca.corners)} · remates x${r2(T.cf.shots)}/x${r2(T.ca.shots)} · tarjetas x${r2(T.cf.cards)}/x${r2(T.ca.cards)} · ${T.ok}/${T.rn}`));
   add('\n## 8. Competiciones (factor de goles, aciertos)');
   Object.values(state.comp||{}).sort((u,v)=>v.n-u.n).forEach(c=>add(`  ${c.name}: n=${c.n} · x${r2(c.f)} · ${c.ok}/${c.rn}`));
   add('\n## 9. Mayores fallos del robot (menor probabilidad dada al resultado real)');
