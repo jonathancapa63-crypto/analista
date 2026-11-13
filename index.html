@@ -435,7 +435,7 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
 
 <script>
 /*ENGINE*/
-const APP_VERSION='v16 · 2026-11-12';
+const APP_VERSION='v17 · 2026-11-13';
 const TRAIN_MAX=500;        // partidos recientes que usa el ajuste de ponderaciones
 const MU = 1.35;            // goles promedio por equipo y partido (referencia)
 const RHO = -0.10;          // corrección Dixon-Coles para marcadores bajos
@@ -719,25 +719,28 @@ function compProfiles(history, th){ const C={};
 /* Balance de las apuestas registradas */
 /* Combinada: todas las jugadas de un partido van en una sola apuesta. Cuota total = producto de las cuotas.
    Se pierde si falla una jugada; se gana si aciertan todas (una jugada anulada cuenta como cuota 1). */
-function comboOf(bets,stake,a){
+function comboOf(bets,stake,a,fo){
+  // fo = cuota final que muestra la casa. En Bet Builder (varias jugadas del mismo partido) la casa calcula su propia cuota
+  // y no coincide con multiplicar las cuotas sueltas, porque las jugadas se relacionan entre sí. Si falta, se usa el producto.
   const legs=bets||[]; if(!legs.length) return null;
-  const st=stake>0?stake:(legs[0].s||0), odds=legs.reduce((u,b)=>u*b.o,1);
-  if(!a) return {state:'pending',odds,eff:odds,stake:st,profit:0,n:legs.length};
-  let lose=false,pend=false,eff=1,allVoid=true;
-  for(const b of legs){ const r=settle(b.c,a); if(r!=='void') allVoid=false; if(r==='lose') lose=true; else if(r==='pending') pend=true; else if(r==='win') eff*=b.o; }
-  const state=lose?'lose':pend?'missing':allVoid?'void':'win';
-  return {state,odds,eff,stake:st,profit:state==='win'?st*(eff-1):state==='lose'?-st:0,n:legs.length};
+  const st=stake>0?stake:(legs[0].s||0), prod=legs.every(b=>b.o>1)?legs.reduce((u,b)=>u*b.o,1):null, odds=fo>1?fo:prod;
+  if(!a) return {state:odds?'pending':'noodds',odds,prod,eff:odds,stake:st,profit:0,n:legs.length};
+  let lose=false,pend=false,allVoid=true,eff=odds||0;
+  for(const b of legs){ const r=settle(b.c,a); if(r!=='void') allVoid=false; if(r==='lose') lose=true; else if(r==='pending') pend=true; else if(r==='void'&&b.o>1&&eff) eff/=b.o; }
+  eff=Math.max(1,eff);
+  const state=lose?'lose':pend?'missing':allVoid?'void':odds?'win':'noodds';
+  return {state,odds,prod,eff,stake:st,profit:state==='win'?st*(eff-1):state==='lose'?-st:0,n:legs.length};
 }
 function betStats(history){ const s={n:0,won:0,lost:0,voided:0,pending:0,staked:0,profit:0};
-  for(const x of history){ const c=comboOf(x.bets,x.stake,x.actual); if(!c) continue;
-    if(c.state==='pending'||c.state==='missing'){ s.pending++; continue; } s.n++;
+  for(const x of history){ const c=comboOf(x.bets,x.stake,x.actual,x.fo); if(!c) continue;
+    if(c.state==='pending'||c.state==='missing'||c.state==='noodds'){ s.pending++; continue; } s.n++;
     if(c.state==='void'){ s.voided++; continue; } s.staked+=c.stake; s.profit+=c.profit;
     if(c.state==='win') s.won++; else s.lost++; }
   return s; }
 /* Acierto de cada jugada por separado, por tipo */
 function legStats(history){ const F={};
   for(const x of history){ if(!x.actual) continue; for(const b of (x.bets||[])){ const v=settle(b.c,x.actual); if(v!=='win'&&v!=='lose') continue;
-    const c=b.c.split(':'), k=c[0]==='ln'?'ln:'+c[1]:c[0], f=F[k]||(F[k]={n:0,w:0,pr:0,od:0}); f.n++; f.pr+=b.p||0; f.od+=b.o; if(v==='win') f.w++; } }
+    const c=b.c.split(':'), k=c[0]==='ln'?'ln:'+c[1]:c[0], f=F[k]||(F[k]={n:0,w:0,pr:0,od:0}); f.n++; f.pr+=b.p||0; if(b.o>1){ f.od+=b.o; f.on=(f.on||0)+1; } if(v==='win') f.w++; } }
   return F; }
 /* Probabilidad de la combinada según el robot. Las jugadas de goles se evalúan juntas (se relacionan entre sí)
    sobre todos los marcadores posibles de cada tiempo; las de remates, tiros a puerta, córners y tarjetas se multiplican aparte. */
@@ -1127,7 +1130,7 @@ function analyze(m){
   for(const st in STATK) mcal.team[st]={h:Math.sqrt((pH?pH.cf[st]:1)*(pA?pA.ca[st]:1)), a:Math.sqrt((pA?pA.cf[st]:1)*(pH?pH.ca[st]:1))};
   const picks=robotPicks(m,r,mcal);
   const xb=extraMarkets(b), xr=extraMarkets(r);
-  current={m,b,r,picks,pH,pA,pC,xb,xr,cal:mcal,bets:prev?prev.bets:[],stake:prev?prev.stake:null,savedId:prev?prev.savedId:null};
+  current={m,b,r,picks,pH,pA,pC,xb,xr,cal:mcal,bets:prev?prev.bets:[],stake:prev?prev.stake:null,fo:prev?prev.fo:null,savedId:prev?prev.savedId:null};
   const h=m.home,a=m.away,hn=esc(h.name),an=esc(a.name), S=summary(m,b), [q1,qx,q2]=round3(b), t=b.top[0];
   const maxP=b.top[0].p, cells=[];
   for(let i=0;i<=5;i++){ let row=`<tr><th>${i}</th>`; for(let j=0;j<=5;j++){ const v=b.M[i][j]; const col=i>j?'76,194,255':i<j?'255,138,92':'147,163,181';
@@ -1233,23 +1236,24 @@ function analyze(m){
     <div class="tablewrap"><table class="plain"><thead><tr><th>Estadística</th><th>Jugada</th><th>Prob.</th></tr></thead><tbody>
       ${picks.map(pk=>`<tr><td>${PICKNAMES[pk.st]}</td><td>${pk.st==='htr'?{'1':'Gana '+hn,'X':'Empate','2':'Gana '+an}[pk.r]:{total:'Partido',home:hn,away:an}[pk.s]+' · '+(pk.o?'Más de ':'Menos de ')+pk.l.toFixed(1)}</td><td>${pc(pk.p)}</td></tr>`).join('')}</tbody></table></div></div>
     <div class="betbox"><h3>Tu combinada</h3>
-      <p class="small muted">Agrega cada jugada con su cuota. Todas van en una sola apuesta: la cuota total se calcula sola.</p>
+      <p class="small muted">Agrega cada jugada. Al final escribe la cuota final que te muestra tu casa: en Bet Builder la casa calcula su propia cuota y no es igual a multiplicar las cuotas sueltas.</p>
       <div class="custom">
         <div class="field" style="grid-column:1/-1"><label for="bet_mkt">Jugada</label><select id="bet_mkt">${betOptions(hn,an)}</select></div>
         <div class="field cst" hidden><label for="bet_stat">Estadística</label><select id="bet_stat">${[['goals','Goles'],['htg','Goles 1T'],['h2g','Goles 2T'],['shots','Remates'],['sot','Tiros a puerta'],['corners','Córners'],['cards','Tarjetas']].map(z=>`<option value="${z[0]}">${z[1]}</option>`).join('')}</select></div>
         <div class="field cst" hidden><label for="bet_scope">De quién</label><select id="bet_scope"><option value="total">Partido</option><option value="home">${hn}</option><option value="away">${an}</option></select></div>
         <div class="field cst" hidden><label for="bet_dir">Sentido</label><select id="bet_dir"><option value="o">Más de</option><option value="u">Menos de</option></select></div>
         <div class="field cst" hidden><label for="bet_line">Línea</label><input type="text" data-num inputmode="decimal" id="bet_line" value="2.5"></div>
-        <div class="field"><label for="bet_odd">Cuota de esta jugada</label><input type="text" data-num inputmode="decimal" id="bet_odd"></div>
+        <div class="field"><label for="bet_odd">Cuota de esta jugada (opcional)</label><input type="text" data-num inputmode="decimal" id="bet_odd"></div>
       </div>
       <p id="bet_info" class="small" aria-live="polite"></p>
       <div class="actions"><button type="button" id="btnBet">Agregar a la combinada</button></div>
       <div id="bet_list"></div>
       <div class="combo" id="comboBox">
-        <div class="ctot"><span>Cuota total</span><b class="num" id="comboOdds">—</b></div>
+        <div class="field"><label for="bet_fo">Cuota final de tu casa</label><input type="text" data-num inputmode="decimal" id="bet_fo"></div>
         <div class="field"><label for="bet_stake">Monto de la apuesta</label><input type="text" data-num inputmode="numeric" id="bet_stake"></div>
         <div class="ctot"><span>Ganancia posible</span><b class="num" id="comboWin">—</b></div>
       </div>
+      <p id="combo_prod" class="small muted"></p>
       <p id="combo_info" class="small" aria-live="polite"></p></div>
     <div class="actions"><button type="button" class="primary" id="btnSave">Guardar pronóstico en el historial</button></div>
     <span class="small muted" id="saveMsg"></span></div>`;
@@ -1313,25 +1317,28 @@ function wireBets(){
     if(o>1){ const ev=p*o-1; t+=ev>=0.05?` Con cuota ${f2(o)} tiene <b style="color:var(--good)">valor (+${Math.round(ev*100)}%)</b>.`:ev>0?` Con cuota ${f2(o)} la ventaja es mínima.`:` Con cuota ${f2(o)} <b style="color:var(--bad)">no tiene valor</b> (${Math.round(ev*100)}%).`; }
     out.innerHTML=t; return {c,p}; };
   const sync=()=>{ const x=current.savedId&&state.history.find(z=>z.id===current.savedId);
-    if(x){ x.bets=current.bets; x.stake=current.stake; persist(); renderRobot(); return; }
-    const d=findDraft(current.m); if(d){ d.bets=current.bets.slice(); d.stake=current.stake; persist(); } };
-  const totals=()=>{ const legs=current.bets, st=current.stake, odds=legs.reduce((u,b)=>u*b.o,1);
+    if(x){ x.bets=current.bets; x.stake=current.stake; if(current.fo>1) x.fo=current.fo; else delete x.fo; persist(); renderRobot(); return; }
+    const d=findDraft(current.m); if(d){ d.bets=current.bets.slice(); d.stake=current.stake; d.fo=current.fo; persist(); } };
+  const totals=()=>{ const legs=current.bets, st=current.stake, prod=legs.length&&legs.every(b=>b.o>1)?legs.reduce((u,b)=>u*b.o,1):null, odds=current.fo>1?current.fo:prod;
     $('comboBox').hidden=!legs.length;
-    $('bet_list').innerHTML=legs.map((b,i)=>`<div class="hb"><div>${codeLabel(b.c,hn,an)}<small>robot ${pc(b.p||0)}</small></div><b class="num">${f2(b.o)}</b><button type="button" class="xbtn" data-bi="${i}" aria-label="Quitar esta jugada" title="Quitar">×</button></div>`).join('');
-    $('comboOdds').textContent=legs.length?f2(odds):'—';
-    $('comboWin').textContent=legs.length&&st>0?'+'+money(st*(odds-1)):'—';
+    $('bet_list').innerHTML=legs.map((b,i)=>`<div class="hb"><div>${codeLabel(b.c,hn,an)}<small>robot ${pc(b.p||0)}</small></div><b class="num">${b.o>1?f2(b.o):'—'}</b><button type="button" class="xbtn" data-bi="${i}" aria-label="Quitar esta jugada" title="Quitar">×</button></div>`).join('');
+    $('bet_fo').placeholder=prod?f2(prod):'Ej.: 26.00';
+    $('comboWin').textContent=legs.length&&st>0&&odds?'+'+money(st*(odds-1)):'—';
+    $('combo_prod').textContent=!legs.length?'':prod?(current.fo>1?`Multiplicando las cuotas sueltas da ${f2(prod)}; se usa la cuota final de tu casa (${f2(current.fo)}).`:`Multiplicando las cuotas sueltas da ${f2(prod)}. Si tu casa muestra otra cuota final, escríbela arriba.`):'Escribe la cuota final de tu casa para calcular la ganancia.';
     const out=$('combo_info'); if(!legs.length){ out.textContent=''; return; }
-    const p=comboProb(legs,m,r,xr,current.cal), ev=p*odds-1;
+    const p=comboProb(legs,m,r,xr,current.cal);
     let t=`Probabilidad de acertar la combinada según el robot: <b>${pc(p)}</b> · cuota justa <b>${fair(p)}</b>.`;
-    t+=ev>=0.05?` Con cuota ${f2(odds)} el retorno esperado es <b style="color:var(--good)">+${Math.round(ev*100)}%</b>. En combinadas no apuestes más del 1% de tu banca.`
-      :ev>0?' La ventaja es mínima.':` Con cuota ${f2(odds)} <b style="color:var(--bad)">no tiene valor</b> (${Math.round(ev*100)}%): cada jugada suma margen de la casa.`;
+    if(odds){ const ev=p*odds-1;
+      t+=ev>=0.05?` Con cuota ${f2(odds)} el retorno esperado es <b style="color:var(--good)">+${Math.round(ev*100)}%</b>. En combinadas no apuestes más del 1% de tu banca.`
+        :ev>0?' La ventaja es mínima.':` Con cuota ${f2(odds)} <b style="color:var(--bad)">no tiene valor</b> (${Math.round(ev*100)}%).`; }
     out.innerHTML=t; };
   ['bet_mkt','bet_stat','bet_scope','bet_dir','bet_line','bet_odd'].forEach(i=>$(i).addEventListener('input',info));
-  $('bet_stake').value=current.stake>0?current.stake:'';
+  $('bet_stake').value=current.stake>0?current.stake:''; $('bet_fo').value=current.fo>1?current.fo:'';
+  let foT=null; $('bet_fo').addEventListener('input',()=>{ const v=val('bet_fo'); current.fo=v>1?v:null; totals(); clearTimeout(foT); foT=setTimeout(sync,700); });
   let stT=null; $('bet_stake').addEventListener('input',()=>{ const v=val('bet_stake'); current.stake=v>0?v:null; totals(); clearTimeout(stT); stT=setTimeout(sync,700); });
-  $('btnBet').onclick=()=>{ const z=info(), o=val('bet_odd'); $('bet_odd').classList.toggle('err',!(o>1));
-    if(!z||!(o>1)) return; if(current.bets.some(b=>b.c===z.c)){ toast('Esa jugada ya está en la combinada'); return; }
-    current.bets.push({c:z.c,o:o,p:Math.round(z.p*1e3)/1e3}); $('bet_odd').value=''; info(); totals(); sync(); toast('Jugada agregada a la combinada'); };
+  $('btnBet').onclick=()=>{ const z=info(), raw=$('bet_odd').value.trim(), o=val('bet_odd'), okO=raw===''||o>1; $('bet_odd').classList.toggle('err',!okO);
+    if(!z||!okO) return; if(current.bets.some(b=>b.c===z.c)){ toast('Esa jugada ya está en la combinada'); return; }
+    current.bets.push({c:z.c,o:raw===''?null:o,p:Math.round(z.p*1e3)/1e3}); $('bet_odd').value=''; info(); totals(); sync(); toast('Jugada agregada a la combinada'); };
   $('bet_list').onclick=e=>{ const t=e.target.closest('[data-bi]'); if(!t) return; if(!t.dataset.sure){ t.dataset.sure='1'; t.textContent='Quitar'; t.classList.add('sure'); return; }
     current.bets.splice(Number(t.dataset.bi),1); totals(); sync(); };
   info(); totals();
@@ -1360,7 +1367,7 @@ function savePrediction(){
   if(!current) return; const {m,b,r,picks}=current, nid=newId();
   current.savedId=nid;
   { const d=findDraft(m); if(d) d.savedId=nid; }
-  state.history.unshift({picks,bets:current.bets,stake:current.stake,ts:Date.now(),id:nid,date:localDate(),
+  state.history.unshift({picks,bets:current.bets,stake:current.stake,fo:current.fo>1?current.fo:undefined,ts:Date.now(),id:nid,date:localDate(),
     inputs:JSON.parse(JSON.stringify(m)),base:slim(b),robot:slim(r),score:b.top[0].h+'-'+b.top[0].a,actual:null});
   state.history=state.history.slice(0,HIST_MAX); persist(); renderRobot();
   toast('Pronóstico guardado en el historial');
@@ -1402,7 +1409,7 @@ const matchKey=m=>teamKey(m.home.name)+'|'+teamKey(m.away.name);
 function findDraft(m){ const k=matchKey(m), day=localDate(); return (state.today||[]).find(d=>matchKey(d.inputs)===k&&localDate(new Date(d.ts))===day); }
 function saveDraft(m){
   state.today=freshToday(state.today); const d=findDraft(m), inputs=JSON.parse(JSON.stringify(m));
-  if(d){ d.inputs=inputs; d.ts=Date.now(); if(current&&current.bets.length){ d.bets=current.bets.slice(); d.stake=current.stake; } state.today.sort((p,q)=>q.ts-p.ts); }
+  if(d){ d.inputs=inputs; d.ts=Date.now(); if(current&&current.bets.length){ d.bets=current.bets.slice(); d.stake=current.stake; d.fo=current.fo; } state.today.sort((p,q)=>q.ts-p.ts); }
   else state.today.unshift({id:'d'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),ts:Date.now(),inputs});
   state.today=state.today.slice(0,40); persist(); renderToday();
 }
@@ -1411,9 +1418,9 @@ function linkSaved(){
   let x=d&&d.savedId&&state.history.find(z=>z.id===d.savedId&&!z.actual);
   if(!x) x=state.history.find(z=>!z.actual&&matchKey(z.inputs)===k&&Date.now()-(z.ts||0)<3*864e5);
   if(x){ if(d) d.savedId=x.id;
-    if(current.savedId!==x.id){ current.savedId=x.id; current.bets=x.bets||(x.bets=[]); current.stake=x.stake||(x.bets[0]&&x.bets[0].s)||null; analyze(current.m); }
+    if(current.savedId!==x.id){ current.savedId=x.id; current.bets=x.bets||(x.bets=[]); current.stake=x.stake||(x.bets[0]&&x.bets[0].s)||null; current.fo=x.fo||null; analyze(current.m); }
     return; }
-  if(d&&d.bets&&d.bets.length&&!current.bets.length){ current.bets=d.bets.slice(); current.stake=d.stake||null; analyze(current.m); }
+  if(d&&d.bets&&d.bets.length&&!current.bets.length){ current.bets=d.bets.slice(); current.stake=d.stake||null; current.fo=d.fo||null; analyze(current.m); }
 }
 function renderToday(){
   const box=$('today'), list=freshToday(state.today), day=localDate();
@@ -1475,7 +1482,7 @@ function renderRvm(){
     c.n++; if(pick3(x.robot)===r) c.ok++;
     (x.picks||[]).forEach(p=>{ const v=pickHit(p,x.actual); if(v!==null){ c.ln++; if(v) c.lok++; } });
     if(x.inputs.odds){ c.mn++; if(fav(x)===r) c.mok++; }
-    { const cb=comboOf(x.bets,x.stake,x.actual); if(cb&&(cb.state==='win'||cb.state==='lose')){ c.st+=cb.stake; c.pf+=cb.profit; } } }
+    { const cb=comboOf(x.bets,x.stake,x.actual,x.fo); if(cb&&(cb.state==='win'||cb.state==='lose')){ c.st+=cb.stake; c.pf+=cb.profit; } } }
   const CL=Object.values(C).sort((u,v)=>v.n-u.n), col=v=>v>0?'var(--good)':v<0?'var(--bad)':'var(--text)';
   h+=`<div class="card"><div class="head"><h2>Por competición</h2><span class="small muted">${CL.length} competicion${CL.length===1?'':'es'}</span></div>
     <div class="tablewrap"><table class="plain"><thead><tr><th>Competición</th><th>Partidos</th><th>Robot 1X2</th><th>Casa 1X2</th><th>Líneas</th><th>Retorno combinadas</th></tr></thead><tbody>${
@@ -1504,7 +1511,7 @@ function renderHistory(){
   if(!state.history.length){ hist.innerHTML='<p class="muted small">Aún no hay pronósticos guardados. Analiza un partido y, en la pestaña Robot, pulsa "Guardar pronóstico en el historial".</p>'; return; }
   // Si el formulario de resultado está abierto, se conserva lo escrito aunque la lista se vuelva a dibujar (por ejemplo, al terminar de sincronizar)
   const keep={}; hist.querySelectorAll('.rpanel input').forEach(i=>{ keep[i.id]=i.value; });
-  hist.innerHTML=all.slice(0,histShow).map(x=>{ const hn=esc(x.inputs.home.name), an=esc(x.inputs.away.name), a=x.actual, c=comboOf(x.bets,x.stake,a);
+  hist.innerHTML=all.slice(0,histShow).map(x=>{ const hn=esc(x.inputs.home.name), an=esc(x.inputs.away.name), a=x.actual, c=comboOf(x.bets,x.stake,a,x.fo);
     return `<div class="hx"><div class="hrow"><div class="t">${hn} vs ${an}</div>${a?`<span class="fs num">${a.h} – ${a.a}</span>`:''}</div>
       <div class="hmeta"><span class="muted small">${fmtDate(x.date)}${x.inputs.comp?' · '+esc(x.inputs.comp):''}</span>${comboChip(c)}</div>
       <div class="ctl"><button type="button" class="mini" data-act="open" data-id="${x.id}">${a?'Editar resultado':'Registrar resultado'}</button><button type="button" class="mini" data-act="load" data-id="${x.id}">Cargar datos</button><button type="button" class="mini danger" data-act="del" data-id="${x.id}">Borrar</button></div>${openId===x.id?resultPanel(x,hn,an):''}</div>`; }).join('');
@@ -1513,18 +1520,18 @@ function renderHistory(){
 const fmtDate=d=>{ const u=String(d||'').split('-'); return u.length===3?u[2]+'/'+u[1]+'/'+u[0]:esc(d||''); };
 function comboChip(c){
   if(!c) return '<span class="st void">Sin apuestas</span>';
-  const od='cuota '+f2(c.odds)+' · '+(c.stake>0?money(c.stake):'sin monto');
+  const od='cuota '+(c.odds?f2(c.odds):'—')+' · '+(c.stake>0?money(c.stake):'sin monto');
   return {pending:`<span class="st pend">Combinada pendiente · ${od}</span>`,missing:`<span class="st pend">Combinada: falta un dato · ${od}</span>`,
-    win:`<span class="st win">Combinada ganada${c.stake>0?' +'+money(c.profit):''} · cuota ${f2(c.eff)}</span>`,lose:`<span class="st lose">Combinada perdida${c.stake>0?' −'+money(c.stake):''} · cuota ${f2(c.odds)}</span>`,
+    win:`<span class="st win">Combinada ganada${c.stake>0?' +'+money(c.profit):''} · cuota ${f2(c.eff)}</span>`,lose:`<span class="st lose">Combinada perdida${c.stake>0?' −'+money(c.stake):''} · cuota ${c.odds?f2(c.odds):'—'}</span>`,noodds:`<span class="st pend">Combinada: falta la cuota final${c.stake>0?' · '+money(c.stake):''}</span>`,
     void:`<span class="st void">Combinada anulada · se devuelve ${money(c.stake)}</span>`}[c.state];
 }
 function legsPanel(x,hn,an){ const a=x.actual, bets=x.bets||[]; if(!bets.length) return '<p class="small muted">Este partido no tiene apuestas registradas.</p>';
-  const ST={win:['win','Ganada'],lose:['lose','Perdida'],void:['void','Anulada'],pending:['pend',a?'Falta dato':'Pendiente']}, c=comboOf(bets,x.stake,a);
+  const ST={win:['win','Ganada'],lose:['lose','Perdida'],void:['void','Anulada'],pending:['pend',a?'Falta dato':'Pendiente']}, c=comboOf(bets,x.stake,a,x.fo);
   return `<h3>Combinada</h3><div>${bets.map((b,i)=>{ const r=a?settle(b.c,a):'pending', st=ST[r];
-      return `<div class="hb"><div>${codeLabel(b.c,hn,an)}${a?` <span class="real">(${betActual(b.c,a)})</span>`:''}<small>cuota ${f2(b.o)}</small></div><b class="st ${st[0]}">${st[1]}</b><button type="button" class="xbtn" data-act="delbet" data-id="${x.id}" data-i="${i}" aria-label="Quitar esta jugada" title="Quitar">×</button></div>`; }).join('')}</div>
-    <div class="combo"><div class="ctot"><span>Cuota total</span><b class="num">${f2(c.odds)}</b></div>
+      return `<div class="hb"><div>${codeLabel(b.c,hn,an)}${a?` <span class="real">(${betActual(b.c,a)})</span>`:''}<small>cuota ${b.o>1?f2(b.o):'—'}</small></div><b class="st ${st[0]}">${st[1]}</b><button type="button" class="xbtn" data-act="delbet" data-id="${x.id}" data-i="${i}" aria-label="Quitar esta jugada" title="Quitar">×</button></div>`; }).join('')}</div>
+    <div class="combo"><div class="field"><label for="r_fo_${x.id}">Cuota final de tu casa</label><input type="text" data-num inputmode="decimal" id="r_fo_${x.id}" value="${x.fo>1?x.fo:''}" placeholder="${c.prod?f2(c.prod):''}"></div>
       <div class="field"><label for="r_stake_${x.id}">Monto de la apuesta</label><input type="text" data-num inputmode="numeric" id="r_stake_${x.id}" value="${c.stake>0?c.stake:''}"></div>
-      <div class="ctot"><span>${c.state==='win'?'Ganancia':c.state==='lose'?'Pérdida':'Ganancia posible'}</span><b class="num" style="color:${c.state==='win'?'var(--good)':c.state==='lose'?'var(--bad)':'var(--text)'}">${c.state==='lose'?'−'+money(c.stake):c.stake>0?'+'+money(c.state==='win'?c.profit:c.stake*(c.odds-1)):'—'}</b></div></div>`;
+      <div class="ctot"><span>${c.state==='win'?'Ganancia':c.state==='lose'?'Pérdida':'Ganancia posible'}</span><b class="num" style="color:${c.state==='win'?'var(--good)':c.state==='lose'?'var(--bad)':'var(--text)'}">${c.state==='lose'?'−'+money(c.stake):c.stake>0?'+'+money(c.state==='win'?c.profit:c.odds?c.stake*(c.odds-1):0):'—'}</b></div></div>`;
 }
 const histOpen=new Set();
 $('history').addEventListener('toggle',e=>{ const d=e.target; if(!d.dataset||!d.dataset.hid) return; if(d.open) histOpen.add(d.dataset.hid); else histOpen.delete(d.dataset.hid); },true);
@@ -1579,6 +1586,7 @@ $('history').addEventListener('click',e=>{ const btn=e.target.closest('button[da
     if(ok&&act.ht&&(act.ht[0]>act.h||act.ht[1]>act.a)){ ok=false; msg='Los goles del primer tiempo no pueden superar los del resultado final.'; }
     if(ok&&act.sot&&act.shots&&(act.sot[0]>act.shots[0]||act.sot[1]>act.shots[1])){ ok=false; msg='Los tiros a puerta no pueden superar los remates.'; }
     if(!ok){ $('rmsg_'+id).textContent=msg; return; }
+    const fe=$('r_fo_'+id); if(fe){ const v=val('r_fo_'+id); if(fe.value.trim()!==''&&!(v>1)){ fe.classList.add('err'); $('rmsg_'+id).textContent='La cuota final debe ser mayor que 1.'; return; } if(v>1) x.fo=v; else delete x.fo; }
     const se=$('r_stake_'+id); if(se){ const v=val('r_stake_'+id); if(se.value.trim()!==''&&!(v>0)){ se.classList.add('err'); $('rmsg_'+id).textContent='El monto debe ser mayor que 0.'; return; } if(v>0) x.stake=v; }
     x.actual=act; openId=null; relearn(); persist(); renderRobot(); if(current) analyze(current.m); toast('Resultado guardado. El robot actualizó su aprendizaje.'); }
 });
@@ -1623,9 +1631,9 @@ function buildReport(){
   add('\n## 5. Primer tiempo'); add(`n=${ht.length} · goles 1T ${ht.reduce((u,x)=>u+x.actual.ht[0]+x.actual.ht[1],0)} de ${ht.reduce((u,x)=>u+x.actual.h+x.actual.a,0)} totales · reparto aprendido ${P((state.cal||{}).ht||0.45,1)}`);
   add('\n## 6. Combinadas (una por partido)');
   add(`Cerradas ${bs.n} · ganadas ${bs.won} · perdidas ${bs.lost} · anuladas ${bs.voided} · pendientes ${bs.pending} · apostado ${Math.round(bs.staked)} · ganancia ${Math.round(bs.profit)} · retorno ${bs.staked?r2(bs.profit/bs.staked*100)+'%':'-'}`);
-  H.filter(x=>x.bets&&x.bets.length).slice(0,40).forEach(x=>{ const c=comboOf(x.bets,x.stake,x.actual); add(`  ${x.date} ${x.inputs.home.name}-${x.inputs.away.name}: ${c.n} jugadas · cuota ${r2(c.odds)} · monto ${Math.round(c.stake)} · ${c.state}${c.state==='win'||c.state==='lose'?' '+Math.round(c.profit):''}`); });
+  H.filter(x=>x.bets&&x.bets.length).slice(0,40).forEach(x=>{ const c=comboOf(x.bets,x.stake,x.actual,x.fo); add(`  ${x.date} ${x.inputs.home.name}-${x.inputs.away.name}: ${c.n} jugadas · cuota ${c.odds?r2(c.odds):'-'}${x.fo?' (casa; producto '+(c.prod?r2(c.prod):'-')+')':''} · monto ${Math.round(c.stake)} · ${c.state}${c.state==='win'||c.state==='lose'?' '+Math.round(c.profit):''}`); });
   add('Acierto por tipo de jugada:');
-  const fam=legStats(H); for(const k in fam){ const f=fam[k]; add(`  ${k}: n=${f.n}, acertadas ${f.w} (${P(f.w,f.n)}), prob media robot ${P(f.pr/f.n,1)}, cuota media ${r2(f.od/f.n)}`); }
+  const fam=legStats(H); for(const k in fam){ const f=fam[k]; add(`  ${k}: n=${f.n}, acertadas ${f.w} (${P(f.w,f.n)}), prob media robot ${P(f.pr/f.n,1)}, cuota media ${f.on?r2(f.od/f.on):'-'}`); }
   add('\n## 7. Equipos con 3 o más partidos (ataque, goles recibidos, reparto 1T, aciertos)');
   Object.values(state.prof||{}).filter(T=>T.n>=3).sort((u,v)=>v.n-u.n).slice(0,80).forEach(T=>add(`  ${T.name}: n=${T.n} · x${r2(T.att)} · x${r2(T.def)} · 1T marca ${P(T.s1f,1)} recibe ${P(T.s1a,1)} · córners x${r2(T.cf.corners)}/x${r2(T.ca.corners)} · remates x${r2(T.cf.shots)}/x${r2(T.ca.shots)} · tarjetas x${r2(T.cf.cards)}/x${r2(T.ca.cards)} · ${T.ok}/${T.rn}`));
   add('\n## 8. Competiciones (factor de goles, aciertos)');
