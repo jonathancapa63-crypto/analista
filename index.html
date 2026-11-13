@@ -402,7 +402,7 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
 
 <script>
 /*ENGINE*/
-const APP_VERSION='v12 · 2026-11-12';
+const APP_VERSION='v13 · 2026-11-12';
 const TRAIN_MAX=500;        // partidos recientes que usa el ajuste de ponderaciones
 const MU = 1.35;            // goles promedio por equipo y partido (referencia)
 const RHO = -0.10;          // corrección Dixon-Coles para marcadores bajos
@@ -511,7 +511,7 @@ function lossFor(done, th){
     if(x.inputs.odds){ const mk=mktProbs(x.inputs.odds), wm=th.wMkt; P=P.map((v,i)=>(1-wm)*v+wm*mk[i]); }
     const po = x.actual.h>x.actual.a ? P[0] : x.actual.h===x.actual.a ? P[1] : P[2];
     L -= wt*Math.log(Math.max(po,1e-9));
-    if(x.actual.xg) L += wt*(Math.pow(lh-x.actual.xg[0],2)+Math.pow(la-x.actual.xg[1],2))/(2*0.7*0.7); // el xG real del partido también enseña
+    if(x.actual.xg) L += wt*(Math.pow(lh-x.actual.xg[0],2)+Math.pow(la-x.actual.xg[1],2))/(2*1.0*1.0); // el xG real del partido también enseña, con menos peso que el marcador (el xG de un solo partido es ruidoso)
   }
   for(const k in THETA0) L += 0.5*Math.pow((th[k]-THETA0[k])/SIGMA[k],2);
   return L;
@@ -1489,7 +1489,7 @@ function buildReport(){
     if(['shots','sot','corners','cards'].indexOf(k)>=0){ const g=done.filter(x=>x.actual[k]); if(g.length){ const rt=g.map(x=>{ const l=lambdas(x.inputs,THETA0); return (x.actual[k][0]+x.actual[k][1])/statMeans(x.inputs,l,k,null).total; }); extra=` · real/proyectado sin ajuste ${r2(avg(rt))} (n=${g.length})`; } }
     add(`${PICKNAMES[k]}: ${lr[k].ok}/${lr[k].n} (${P(lr[k].ok,lr[k].n)})${extra}`); }
   const allp=[]; done.forEach(x=>(x.picks||[]).forEach(p=>{ const h=pickHit(p,x.actual); if(h!==null) allp.push([p.p,h]); }));
-  for(const [lo,hi] of [[0,.55],[.55,.62],[.62,.68],[.68,.76]]){ const g=allp.filter(z=>z[0]>=lo&&z[0]<hi); if(g.length) add(`  jugadas con prob ${Math.round(lo*100)}-${Math.round(hi*100)}%: n=${g.length}, acierto ${P(g.filter(z=>z[1]).length,g.length)}`); }
+  for(const [lo,hi] of [[0,.55],[.55,.62],[.62,.68],[.68,.76],[.76,1.01]]){ const g=allp.filter(z=>z[0]>=lo&&z[0]<hi); if(g.length) add(`  jugadas con prob ${Math.round(lo*100)}-${Math.round(Math.min(1,hi)*100)}%: n=${g.length}, acierto ${P(g.filter(z=>z[1]).length,g.length)}`); }
   const ht=done.filter(x=>x.actual.ht);
   add('\n## 5. Primer tiempo'); add(`n=${ht.length} · goles 1T ${ht.reduce((u,x)=>u+x.actual.ht[0]+x.actual.ht[1],0)} de ${ht.reduce((u,x)=>u+x.actual.h+x.actual.a,0)} totales · reparto aprendido ${P((state.cal||{}).ht||0.45,1)}`);
   add('\n## 6. Apuestas registradas');
