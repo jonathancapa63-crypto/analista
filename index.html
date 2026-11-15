@@ -201,6 +201,11 @@ td.tap:active,tr.tap:active td{background:var(--line)}
 .hx .fs{font-family:var(--display);font-size:24px;font-weight:800;white-space:nowrap}
 .hmeta{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:-4px}
 .hmeta .st{white-space:normal}
+.st.due{color:#1a1400;background:var(--warn)}
+.st.live{color:var(--home);background:rgba(76,194,255,.13)}
+.duebar{display:block;width:100%;text-align:left;background:rgba(255,182,72,.14);border:1px solid var(--warn);color:var(--text);font-weight:400;font-size:14px;border-radius:12px;padding:10px 12px}
+.duebar b{color:var(--warn)} .duebar u{color:var(--warn);font-weight:600}
+input[type=date],input[type=time]{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px;font:inherit;min-width:0;color-scheme:dark}
 .combo{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:10px;align-items:end;background:var(--bg);border-radius:12px;padding:10px 12px}
 .ctot{display:flex;flex-direction:column;gap:2px}
 .ctot span{font-size:12px;color:var(--muted)}
@@ -288,6 +293,7 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
 <header class="top">
   <h1>Analista de partidos</h1><span class="pill" id="syncPill">Cargando memoria</span>
 </header>
+<button type="button" class="duebar" id="dueBar" hidden></button>
 <nav class="maintabs" id="mainTabs" role="tablist" aria-label="Secciones">
   <button type="button" role="tab" data-go="partido"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/></svg><span>Partido</span></button>
   <button type="button" role="tab" data-go="hoy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4M9 15l2 2 4-4"/></svg><span>Hoy</span></button>
@@ -325,6 +331,10 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
         <div class="field"><label for="a_n">Últimos N partidos</label><input type="text" data-num id="a_n" inputmode="numeric"></div>
       </div>
     </div>
+  </div>
+  <div class="duo">
+    <div class="field"><label for="kdate">Fecha del partido</label><input type="date" id="kdate"></div>
+    <div class="field"><label for="ktime">Hora del partido (tu hora)</label><input type="time" id="ktime"></div>
   </div>
   <div class="duo">
     <div class="field"><label for="comp">Competición (opcional)</label><input type="text" id="comp" list="compList" autocomplete="off" placeholder="Ej.: Liga de las Naciones"></div>
@@ -435,14 +445,14 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
 
 <script>
 /*ENGINE*/
-const APP_VERSION='v19 · 2026-11-13';
+const APP_VERSION='v21 · 2026-11-15';
 const TRAIN_MAX=500;        // partidos recientes que usa el ajuste de ponderaciones
 const MU = 1.35;            // goles promedio por equipo y partido (referencia)
 const RHO = -0.10;          // corrección Dixon-Coles para marcadores bajos
 const SHRINK = 6;           // partidos "fantasma" que acercan muestras chicas al promedio
 const THETA0 = {wMkt:0.35, sharp:1.00, wXG:0.60, homeAdv:1.20, rankK:0.25, formK:0.30, goalScale:1.00, wEmp:0.20, wForm:0.30};
 const BOUNDS = {wMkt:[0,0.85], sharp:[0.60,1.50], wXG:[0,1], homeAdv:[1.00,1.50], rankK:[0,0.80], formK:[0,1.20], goalScale:[0.70,1.40], wEmp:[0,0.60], wForm:[0,0.60]};
-const SIGMA  = {wMkt:0.20, sharp:0.20, wXG:0.25, homeAdv:0.12, rankK:0.20, formK:0.30, goalScale:0.12, wEmp:0.15, wForm:0.15};
+const SIGMA  = {wMkt:0.20, sharp:0.20, wXG:0.25, homeAdv:0.12, rankK:0.20, formK:0.30, goalScale:0.18, wEmp:0.15, wForm:0.15};
 const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
 // Lo aprendido envejece: un partido de hace 180 días pesa la mitad que uno de hoy
 const HALF_LIFE=180; let NOW=Date.now();
@@ -587,7 +597,7 @@ function lineOver(m,b,stat,scope,line,cal){
     if(scope==='total'){ let s=0; for(let i=0;i<b.M.length;i++) for(let j=0;j<b.M.length;j++) if(i+j>line) s+=b.M[i][j]; return s; }
     return countOver(scope==='home'?b.lh:b.la,1,line);
   }
-  return countOver(statMeans(m,b,stat,cal)[scope],PHI[stat],line);
+  return countOver(statMeans(m,b,stat,cal)[scope],(cal&&cal.phi&&cal.phi[stat])||PHI[stat],line);
 }
 /* Filas de cada pestaña: el rango de líneas se adapta a la proyección del partido */
 function lineRows(mu,stat){
@@ -626,6 +636,12 @@ function calibrate(history){
       if(!cache.has(x)) cache.set(x,lambdas(x.inputs,THETA0));
       const pred=statMeans(x.inputs,cache.get(x),st,null).total, w=wAge(x); if(pred>0){ s+=w*(a[0]+a[1])/pred; n+=w; } }
     cal[st]=clamp((3+s)/(3+n),0.6,1.6); }
+  // Dispersión: cuánto varía cada estadística alrededor de lo proyectado. Si varía más de lo supuesto, las líneas se vuelven más prudentes.
+  cal.phi={};
+  for(const st of ['shots','sot','corners','cards']){ let z=0,n=0;
+    for(const x of history){ const a=x.actual&&x.actual[st]; if(!a) continue;
+      const mu=statMeans(x.inputs,cache.get(x)||lambdas(x.inputs,THETA0),st,null).total*cal[st], w=wAge(x); if(mu>0){ z+=w*Math.pow(a[0]+a[1]-mu,2)/mu; n+=w; } }
+    cal.phi[st]=clamp((PHI[st]*8+z)/(8+n),1,3); }
   // Reparto de goles en el primer tiempo: parte de 45% y se corrige con los descansos registrados
   let hg=0, fg=0; for(const x of history){ const t=x.actual&&x.actual.ht; if(t){ const w=wAge(x); hg+=w*(t[0]+t[1]); fg+=w*(x.actual.h+x.actual.a); } }
   cal.ht=clamp((0.45*14+hg)/(14+fg),0.30,0.60);
@@ -875,7 +891,7 @@ const DEMO={h_name:'Turquía',a_name:'Bélgica',h_rank:31,a_rank:8,h_n:21,a_n:24
  h_corners:6,a_corners:7,h_cards:2.71,a_cards:1.75,h_penScored:2,h_penTaken:4,a_penScored:5,a_penTaken:7,a_crowd:54,comp:'Liga de las Naciones UEFA',
  h_f_gf:1,h_f_ga:2.6,h_f_xg:1.42,h_f_xga:1.75,a_f_gf:1.4,a_f_ga:1.4,a_f_xg:1.1,a_f_xga:1.61};
 function fill(obj){ clearForm(); for(const k in obj){ if($(k)) $(k).value=obj[k]; } updatePcts(); }
-function clearForm(){ $('form').reset(); document.querySelectorAll('#form .err').forEach(e=>e.classList.remove('err')); $('errors').hidden=true; updatePcts(); }
+function clearForm(){ $('form').reset(); $('kdate').value=localDate(); document.querySelectorAll('#form .err').forEach(e=>e.classList.remove('err')); $('errors').hidden=true; updatePcts(); }
 $('btnDemo').onclick=()=>fill(DEMO);
 $('btnClear').onclick=()=>{ clearForm(); $('results').hidden=true; $('noAnalysis').hidden=false; current=null; };
 
@@ -883,6 +899,7 @@ function readForm(){
   const errs=[], bad=new Set();
   const need=(id,label)=>{ const v=val(id); if(v===null||!isFinite(v)||v<0){ bad.add(id); return null; } return v; };
   const m={neutral:$('neutral').checked, split:$('view').value==='split', comp:$('comp').value.trim().slice(0,40)};
+  { const t=$('ktime').value, d=$('kdate').value||localDate(); if(/^\d{2}:\d{2}$/.test(t)&&/^\d{4}-\d{2}-\d{2}$/.test(d)) m.kickoff=d+'T'+t; }
   let missing=0;
   for(const [s,key,def] of [['h','home','Local'],['a','away','Visitante']]){
     const t={name:($(s+'_name').value.trim()||def).slice(0,40), rank:val(s+'_rank')||0};
@@ -1118,7 +1135,7 @@ function robotOpinion(m,b,r){
 function analyze(m){
   let prev=current&&matchKey(current.m)===matchKey(m)?current:null;
   if(prev&&prev.savedId){ const sx=state.history.find(z=>z.id===prev.savedId); if(sx&&sx.actual) prev=null; }   // ese partido ya se jugó: análisis nuevo
-  const share=(state.cal&&state.cal.ht)||0.45, b=predict(m,THETA0,share);
+  const share=(state.cal&&state.cal.ht)||0.45, base=predict(m,THETA0,share);
   const P=state.prof||{}, pH=P[teamKey(m.home.name)], pA=P[teamKey(m.away.name)];
   const adj={h:Math.sqrt((pH?pH.att:1)*(pA?pA.def:1)), a:Math.sqrt((pA?pA.att:1)*(pH?pH.def:1))};
   const pC=(state.comp||{})[teamKey(m.comp||'')]; if(pC){ adj.h*=pC.f; adj.a*=pC.f; }
@@ -1128,13 +1145,14 @@ function analyze(m){
   const mcal=Object.assign({},state.cal,{team:{}});
   for(const st in STATK) mcal.team[st]={h:Math.sqrt((pH?pH.cf[st]:1)*(pA?pA.ca[st]:1)), a:Math.sqrt((pA?pA.cf[st]:1)*(pH?pH.ca[st]:1))};
   const picks=robotPicks(m,r,mcal);
-  const xb=extraMarkets(b), xr=extraMarkets(r);
-  current={m,b,r,picks,pH,pA,pC,xb,xr,cal:mcal,bets:prev?prev.bets:[],stake:prev?prev.stake:null,fo:prev?prev.fo:null,savedId:prev?prev.savedId:null};
+  // Lo que se muestra (marcador, mercados, líneas) sale del robot, que aprende. El modelo base de fábrica queda como referencia.
+  const b=r, xr=extraMarkets(r), xb=xr;
+  current={m,b,base,r,picks,pH,pA,pC,xb,xr,cal:mcal,bets:prev?prev.bets:[],stake:prev?prev.stake:null,fo:prev?prev.fo:null,savedId:prev?prev.savedId:null};
   const h=m.home,a=m.away,hn=esc(h.name),an=esc(a.name), S=summary(m,b), [q1,qx,q2]=round3(b), t=b.top[0];
   const maxP=b.top[0].p, cells=[];
   for(let i=0;i<=5;i++){ let row=`<tr><th>${i}</th>`; for(let j=0;j<=5;j++){ const v=b.M[i][j]; const col=i>j?'76,194,255':i<j?'255,138,92':'147,163,181';
     row+=`<td><button type="button" class="sc" data-sc="${i}-${j}" style="background:rgba(${col},${(0.08+0.85*v/maxP).toFixed(2)})" aria-label="${i} a ${j}, ${(v*100).toFixed(1)} por ciento">${(v*100).toFixed(1)}</button></td>`; } cells.push(row+'</tr>'); }
-  const al=buildAlerts(m,b), vr=valueRows(m,b), op=robotOpinion(m,b,r), [r1,rx,r2]=round3(r);
+  const al=buildAlerts(m,b), vr=valueRows(m,base), op=robotOpinion(m,base,r), [r1,rx,r2]=round3(r), [bq1,bqx,bq2]=round3(base);
   const off=x=>clamp(Math.round(x/MU*50),0,100), sol=x=>clamp(Math.round(100-x/MU*50),0,100);
   const trend=b.o25>=0.58?'Alta':b.o25<=0.44?'Baja':'Media';
   let html=`
@@ -1229,7 +1247,7 @@ function analyze(m){
         :`<div class="verdict no"><b>No apostar</b>Ninguna jugada llega a ${Math.round(v.thr*100)}% (confianza media). La más alta es ${L(v.best)}.${v.strict?` Subí la exigencia porque mis jugadas sobre 60% venían acertando ${v.ok} de ${v.n}.`:''}</div>`; })()}
     <div class="say">${op.html}</div>
     <div class="tablewrap"><table class="plain"><thead><tr><th></th><th>Gana ${hn}</th><th>Empate</th><th>Gana ${an}</th></tr></thead><tbody>
-      <tr><td>Modelo base</td><td>${q1}%</td><td>${qx}%</td><td>${q2}%</td></tr>
+      <tr><td>Modelo base</td><td>${bq1}%</td><td>${bqx}%</td><td>${bq2}%</td></tr>
       <tr><td>Robot</td><td>${r1}%</td><td>${rx}%</td><td>${r2}%</td></tr></tbody></table></div>
     <div><h3>Mis jugadas recomendadas</h3>
     ${(()=>{ const ok=picks.filter(pk=>pk.p>=CONF_MID).sort((u,v)=>v.p-u.p), lab=pk=>pk.st==='htr'?(pk.r.length>1?{'1X':hn+' o empate','X2':an+' o empate','12':'Sin empate'}[pk.r]:{'1':'Gana '+hn,'X':'Empate','2':'Gana '+an}[pk.r]):{total:'Partido',home:hn,away:an}[pk.s]+' · '+(pk.o?'Más de ':'Menos de ')+pk.l.toFixed(1);
@@ -1349,10 +1367,10 @@ $('form').addEventListener('submit',e=>{ e.preventDefault(); const m=readForm();
 
 function slim(p){ const r=x=>Math.round(x*1e4)/1e4; return {p1:r(p.p1),px:r(p.px),p2:r(p.p2),o25:r(p.o25),btts:r(p.btts)}; }
 function savePrediction(){
-  if(!current) return; const {m,b,r,picks}=current, nid=newId();
+  if(!current) return; const {m,base:b,r,picks}=current, nid=newId();
   current.savedId=nid;
   { const d=findDraft(m); if(d) d.savedId=nid; }
-  state.history.unshift({picks,bets:current.bets,stake:current.stake,fo:current.fo>1?current.fo:undefined,ts:Date.now(),id:nid,date:localDate(),
+  state.history.unshift({picks,bets:current.bets,stake:current.stake,fo:current.fo>1?current.fo:undefined,ts:Date.now(),id:nid,date:m.kickoff?m.kickoff.slice(0,10):localDate(),
     inputs:JSON.parse(JSON.stringify(m)),base:slim(b),robot:slim(r),score:b.top[0].h+'-'+b.top[0].a,actual:null});
   state.history=state.history.slice(0,HIST_MAX); persist(); renderRobot();
   toast('Pronóstico guardado en el historial');
@@ -1384,7 +1402,7 @@ function renderRobot(){
   const used=state.history.length/HIST_MAX;
   if(used>=0.9) h+=`<div class="msg" style="margin-top:12px">La memoria está al ${Math.round(used*100)}%: quedan ${HIST_MAX-state.history.length} espacios de ${HIST_MAX}. Al llenarse se borran los partidos más antiguos. Genera un informe y envíalo antes de que eso pase.</div>`;
   $('robotStats').innerHTML=h;
-  $('histBadge').hidden=!pend; $('histBadge').textContent=pend;
+  updateDue();
   renderRvm();
   renderToday();
   renderHistory();
@@ -1415,7 +1433,7 @@ function renderToday(){
   const item=d=>{ const m=d.inputs, hn=esc(m.home.name), an=esc(m.away.name), p=predict(m,THETA0), q=round3(p), t=p.top[0], tm=new Date(d.ts);
     const saved=d.savedId&&state.history.find(x=>x.id===d.savedId);
     return `<div class="h-item"><div><div class="t">${hn} vs ${an}</div>
-      <div class="small muted">${String(tm.getHours()).padStart(2,'0')}:${String(tm.getMinutes()).padStart(2,'0')}${m.comp?' · '+esc(m.comp):''} · ${q[0]}% / ${q[1]}% / ${q[2]}% · marcador ${t.h}–${t.a}</div></div>
+      <div class="small muted">${m.kickoff?'Partido '+(m.kickoff.slice(0,10)===localDate()?'hoy':fmtDate(m.kickoff.slice(0,10)))+' '+m.kickoff.slice(11,16):'Analizado '+String(tm.getHours()).padStart(2,'0')+':'+String(tm.getMinutes()).padStart(2,'0')}${m.comp?' · '+esc(m.comp):''} · ${q[0]}% / ${q[1]}% / ${q[2]}% · marcador ${t.h}–${t.a}</div></div>
       <div class="ctl">${saved?`<span class="pill good">${saved.actual?'Con resultado':'Pronóstico guardado'}</span>`:''}<button type="button" class="mini" data-tact="open" data-id="${d.id}">Abrir análisis</button><button type="button" class="mini" data-tact="edit" data-id="${d.id}">Editar datos</button><button type="button" class="mini danger" data-tact="del" data-id="${d.id}">Quitar</button></div></div>`; };
   const old=list.filter(d=>localDate(new Date(d.ts))!==day);
   box.innerHTML=mine.map(item).join('')+(old.length?`<h3 style="margin-top:8px">Ayer</h3>`+old.map(item).join(''):'');
@@ -1485,10 +1503,26 @@ function renderRvm(){
       :'<p class="muted" style="max-width:65ch">Todavía no hay combinadas cerradas. Ármalas en la pestaña Robot después de analizar un partido; se cierran solas al ingresar el resultado.</p>')+'</div>';
   box.innerHTML=h;
 }
+/* ---------- Partidos terminados sin resultado ---------- */
+const MATCH_LEN=115*60*1000;   // un partido dura cerca de 1 h 55 min con el descanso y los descuentos
+const kickTs=x=>x.inputs&&x.inputs.kickoff?Date.parse(x.inputs.kickoff):NaN;
+function matchState(x){ if(x.actual) return 'done'; const k=kickTs(x), now=Date.now();
+  if(isFinite(k)) return now>=k+MATCH_LEN?'due':now>=k?'live':'soon';
+  return x.date&&x.date<localDate()?'due':'nodate'; }   // sin hora: avisa desde el día siguiente
+const hhmm=t=>{ const d=new Date(t); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+function updateDue(){
+  const due=state.history.filter(x=>matchState(x)==='due').length, b=$('dueBar');
+  $('histBadge').hidden=!due; $('histBadge').textContent=due;
+  b.hidden=!due; b.innerHTML=due?`<b>${due===1?'1 partido terminó':due+' partidos terminaron'}</b> sin resultado registrado. <u>Registrar ahora</u>`:'';
+}
+$('dueBar').onclick=()=>{ $('histPend').checked=true; histShow=30; setTab('historial'); renderHistory(); };
+setInterval(()=>{ updateDue(); if(document.body.dataset.tab==='historial'&&!openId) renderHistory(); },60000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ updateDue(); if(document.body.dataset.tab==='historial'&&!openId) renderHistory(); } });
 let histShow=30;
 function renderHistory(){
   const hist=$('history'), q=teamKey($('histQ').value), pend=$('histPend').checked;
   const all=state.history.filter(x=>(!pend||!x.actual)&&(!q||teamKey(x.inputs.home.name+' '+x.inputs.away.name+' '+(x.inputs.comp||'')).indexOf(q)>=0));
+  if(pend){ const o={due:0,live:1,soon:2,nodate:3}; all.sort((u,v)=>(o[matchState(u)]-o[matchState(v)])||((kickTs(u)||0)-(kickTs(v)||0))); }   // primero los que ya terminaron
   $('histMore').hidden=all.length<=histShow; $('histMore').textContent=`Mostrar más partidos (${Math.max(0,all.length-histShow)} restantes)`;
   if(state.history.length&&!all.length){ hist.innerHTML='<p class="muted small">Ningún partido coincide con la búsqueda.</p>'; return; }
   if(!state.history.length){ hist.innerHTML='<p class="muted small">Aún no hay pronósticos guardados. Analiza un partido y, en la pestaña Robot, pulsa "Guardar pronóstico en el historial".</p>'; return; }
@@ -1496,10 +1530,15 @@ function renderHistory(){
   const keep={}; hist.querySelectorAll('.rpanel input').forEach(i=>{ keep[i.id]=i.value; });
   hist.innerHTML=all.slice(0,histShow).map(x=>{ const hn=esc(x.inputs.home.name), an=esc(x.inputs.away.name), a=x.actual, c=comboOf(x.bets,x.stake,a,x.fo);
     return `<div class="hx"><div class="hrow"><div class="t">${hn} vs ${an}</div>${a?`<span class="fs num">${a.h} – ${a.a}</span>`:''}</div>
-      <div class="hmeta"><span class="muted small">${fmtDate(x.date)}${x.inputs.comp?' · '+esc(x.inputs.comp):''}</span>${comboChip(c)}</div>
+      <div class="hmeta"><span class="muted small">${fmtDate(x.date)}${isFinite(kickTs(x))?' · '+hhmm(kickTs(x)):''}${x.inputs.comp?' · '+esc(x.inputs.comp):''}</span>${timeChip(x)}${comboChip(c)}</div>
       <div class="ctl"><button type="button" class="mini" data-act="open" data-id="${x.id}">${a?'Editar resultado':'Registrar resultado'}</button><button type="button" class="mini" data-act="load" data-id="${x.id}">Cargar datos</button><button type="button" class="mini danger" data-act="del" data-id="${x.id}">Borrar</button></div>${openId===x.id?resultPanel(x,hn,an):''}</div>`; }).join('');
   for(const id in keep){ const el=document.getElementById(id); if(el) el.value=keep[id]; }
 }
+function timeChip(x){ const s=matchState(x), k=kickTs(x);
+  if(s==='due') return '<span class="st due">Partido terminado: registra el resultado</span>';
+  if(s==='live') return `<span class="st live">En juego · termina cerca de las ${hhmm(k+MATCH_LEN)}</span>`;
+  if(s==='soon'){ const mins=Math.round((k-Date.now())/60000); return `<span class="st void">Comienza ${mins<60?'en '+Math.max(1,mins)+' min':localDate(new Date(k))===localDate()?'hoy a las '+hhmm(k):fmtDate(localDate(new Date(k)))+' a las '+hhmm(k)}</span>`; }
+  return ''; }
 const fmtDate=d=>{ const u=String(d||'').split('-'); return u.length===3?u[2]+'/'+u[1]+'/'+u[0]:esc(d||''); };
 function comboChip(c){
   if(!c) return '<span class="st void">Sin apuestas</span>';
@@ -1543,6 +1582,7 @@ function toForm(m){ const o={neutral:null};
     for(const k of ['n','penScored','penTaken'].concat(RES.map(r=>r[0]),AVG.map(r=>r[0]))) if(t[k]!=null) o[s+'_'+k]=t[k];
     if(t.form) for(const k in t.form) o[s+'_f_'+k]=t.form[k]; }
   if(m.comp) o.comp=m.comp;
+  if(m.kickoff){ o.kdate=m.kickoff.slice(0,10); o.ktime=m.kickoff.slice(11,16); }
   delete o.neutral; fill(o); $('neutral').checked=!!m.neutral; $('view').value=m.split?'split':'all';
   if(m.odds){ $('o1').value=m.odds[0]; $('ox').value=m.odds[1]; $('o2').value=m.odds[2]; } }
 $('history').addEventListener('click',e=>{ const btn=e.target.closest('button[data-act]'); if(!btn) return;
@@ -1579,7 +1619,7 @@ function buildReport(){
   add(`Partidos guardados ${H.length} de ${HIST_MAX} · con resultado ${done.length} · pendientes ${H.length-done.length}`);
   add('\n## 1. Ponderaciones (fábrica -> ahora)');
   for(const k in THETA0) add(`${k}: ${THETA0[k]} -> ${r3(state.theta[k])}`);
-  add('Calibración de conteos y 1T: '+JSON.stringify(Object.fromEntries(Object.entries(state.cal||{}).map(([k,v])=>[k,r3(v)]))));
+  add('Calibración de conteos y 1T: '+JSON.stringify(Object.fromEntries(Object.entries(state.cal||{}).map(([k,v])=>[k,typeof v==='number'?r3(v):Object.fromEntries(Object.entries(v).map(([u,w])=>[u,r3(w)]))]))));
   add('\n## 2. Resultado 1X2');
   add(`n=${rec.n} · acierto robot ${P(rec.rAcc,1)} · acierto base ${P(rec.bAcc,1)} · Brier robot ${r3(rec.rBrier)} · Brier base ${r3(rec.bBrier)} · Log robot ${r3(rec.rLog)} · Log base ${r3(rec.bLog)}`);
   add(`Más/Menos 2.5 acierto ${P(rec.ou,1)} · Ambos marcan acierto ${P(rec.btts,1)}`);
@@ -1638,6 +1678,7 @@ $('btnReset').onclick=e=>{ const b=e.currentTarget; if(!b.dataset.sure){ b.datas
   delete b.dataset.sure; b.textContent='Borrar memoria del robot';
   state={v:1,theta:Object.assign({},THETA0),history:[],today:state.today||[],updatedAt:0}; relearn(); persist(); renderRobot(); if(current) analyze(current.m); $('backupMsg').textContent='Memoria borrada.'; };
 
+$('kdate').value=localDate();
 updatePcts();
 loadMemory();
 </script>
