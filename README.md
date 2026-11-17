@@ -13,3 +13,7 @@ App web (también funciona como Mini App de Telegram) para analizar partidos de 
 El registro automático de resultados corre cada vez que abres la app (y cada 10 minutos mientras está abierta).
 
 Las probabilidades son estimaciones estadísticas, no garantías.
+
+## Calidad
+
+La precisión se mide con partidos reales ya jugados. Ver [AUDITORIA.md](AUDITORIA.md) y la carpeta `tests/`.
