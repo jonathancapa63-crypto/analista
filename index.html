@@ -546,7 +546,7 @@ body:not([data-tab="analisis"]) .hteam b{font-size:18px}
 
 <script>
 /*ENGINE*/
-const APP_VERSION='v26 · 2026-11-17';
+const APP_VERSION='v27 · 2026-11-17';
 const TRAIN_MAX=500;        // partidos recientes que usa el ajuste de ponderaciones
 const MU = 1.35;            // goles promedio por equipo y partido (referencia)
 const RHO = -0.10;          // corrección Dixon-Coles para marcadores bajos
@@ -1198,7 +1198,7 @@ async function loadCloud(attempt){
     if(!state.history.length) setSync('Guardado en Telegram','good');
   }catch(e){
     if(attempt<4){ setSync('No se pudo leer Telegram; reintentando…','bad'); setTimeout(()=>loadCloud(attempt+1),attempt*8000); }
-    else setSync('Sin conexión con Telegram: guardando solo en este dispositivo','bad'); }
+    else { cloudFailed=true; if(window.__autoReady) autoSettle(); setSync('Sin conexión con Telegram: guardando solo en este dispositivo','bad'); } }
 }
 
 /* ---------- Análisis ---------- */
@@ -1700,10 +1700,14 @@ function matchState(x){ if(x.actual) return 'done'; const k=kickTs(x), now=Date.
   if(isFinite(k)) return now>=k+MATCH_LEN?'due':now>=k?'live':'soon';
   return x.date&&x.date<localDate()?'due':'nodate'; }   // sin hora: avisa desde el día siguiente
 const hhmm=t=>{ const d=new Date(t); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+// Solo necesita al usuario un partido que ESPN no tiene, o uno que pasadas 24 horas ESPN aún no da por terminado
+function needsManual(x){ if(matchState(x)!=='due') return false;
+  if(x.inputs.ev){ const k=Date.parse(x.inputs.ev.t); return Date.now()-k>24*36e5; }
+  return !!x.noEspn; }
 function updateDue(){
-  const due=state.history.filter(x=>matchState(x)==='due').length, b=$('dueBar');
+  const due=state.history.filter(needsManual).length, b=$('dueBar');
   $('histBadge').hidden=!due; $('histBadge').textContent=due;
-  b.hidden=!due; b.innerHTML=due?`<b>${due===1?'1 partido terminó':due+' partidos terminaron'}</b> sin resultado registrado. <u>Registrar ahora</u>`:'';
+  b.hidden=!due; b.innerHTML=due?`<b>${due===1?'1 partido no está en ESPN':due+' partidos no están en ESPN'}</b>: el robot no puede registrar su resultado solo. <u>Escribirlo</u>`:'';
 }
 $('dueBar').onclick=()=>{ $('histPend').checked=true; histShow=30; setTab('historial'); renderHistory(); };
 setInterval(()=>{ updateDue(); if(document.body.dataset.tab==='historial'&&!openId) renderHistory(); },60000);
@@ -1725,7 +1729,7 @@ function renderHistory(){
   for(const id in keep){ const el=document.getElementById(id); if(el) el.value=keep[id]; }
 }
 function timeChip(x){ const s=matchState(x), k=kickTs(x);
-  if(s==='due') return '<span class="st due">Partido terminado: registra el resultado</span>';
+  if(s==='due') return needsManual(x)?'<span class="st due">No está en ESPN: escribe el resultado</span>':'<span class="st live">Terminado · el robot registrará el resultado solo</span>';
   if(s==='live') return `<span class="st live">En juego · termina cerca de las ${hhmm(k+MATCH_LEN)}</span>`;
   if(s==='soon'){ const mins=Math.round((k-Date.now())/60000); return `<span class="st void">Comienza ${mins<60?'en '+Math.max(1,mins)+' min':localDate(new Date(k))===localDate()?'hoy a las '+hhmm(k):fmtDate(localDate(new Date(k)))+' a las '+hhmm(k)}</span>`; }
   return ''; }
@@ -2003,10 +2007,30 @@ function actualOf(d){
   if(a.sot&&a.shots&&(a.sot[0]>a.shots[0]||a.sot[1]>a.shots[1])){ delete a.sot; delete a.shots; }
   return a; }
 let settling=false;
+// ¿Es el mismo equipo? Cada palabra del nombre más corto debe calzar con el comienzo de una palabra del otro
+// ("U. de Chile" = "Universidad de Chile", "Man City" = "Manchester City", pero "Manchester City" ≠ "Manchester United")
+function sameTeam(a,b){ const x=teamKey(a), y=teamKey(b); if(x===y) return true;
+  let A=x.split(' ').filter(Boolean), B=y.split(' ').filter(Boolean); if(A.length>B.length) [A,B]=[B,A]; if(!A.length) return false;
+  const used=new Set();
+  return A.every(w=>{ const k=B.findIndex((v,i)=>!used.has(i)&&(v===w||(v.startsWith(w)||w.startsWith(v)))); if(k<0) return false; used.add(k); return true; }); }
+const kickOf=x=>x.inputs.kickoff?Date.parse(x.inputs.kickoff):NaN;
+// Pronósticos sin vínculo con ESPN (guardados a mano o con versiones antiguas): se buscan por fecha y nombres
+async function linkToEspn(now){
+  const cand=state.history.filter(x=>!x.actual&&x.inputs&&!x.inputs.ev&&!x.noEspn&&(isFinite(kickOf(x))?now-kickOf(x)>105*6e4&&now-kickOf(x)<30*864e5:x.date&&x.date<localDate()&&now-Date.parse(x.date)<30*864e5));
+  if(!cand.length) return 0; const days=[...new Set(cand.map(x=>(x.inputs.kickoff||x.date).slice(0,10)))]; let n=0;
+  for(const ds of days){ let list; try{ list=await dayMatches(ds); }catch(e){ continue; }   // sin conexión: se reintenta más tarde
+    for(const x of cand.filter(z=>(z.inputs.kickoff||z.date).slice(0,10)===ds)){
+      const ev=list.find(e=>sameTeam(e.home.name,x.inputs.home.name)&&sameTeam(e.away.name,x.inputs.away.name));
+      if(ev){ x.inputs.ev={id:ev.id,lg:ev.lg,t:ev.t}; n++; } else x.noEspn=1; } }
+  return n; }
+let cloudFailed=false;
 async function autoSettle(){
-  if(settling||(CS&&!cloudReady)) return; settling=true;
-  try{ const now=Date.now(), due=state.history.filter(x=>!x.actual&&x.inputs&&x.inputs.ev&&now-Date.parse(x.inputs.ev.t)>105*6e4&&now-Date.parse(x.inputs.ev.t)<30*864e5);
-    if(!due.length) return;
+  if(settling) return;
+  if(CS&&!cloudReady&&!cloudFailed){ setTimeout(autoSettle,4000); return; }   // espera a que cargue la memoria de Telegram
+  settling=true;
+  try{ const linked=await linkToEspn(Date.now()); if(linked) persist();
+    const now=Date.now(), due=state.history.filter(x=>!x.actual&&x.inputs&&x.inputs.ev&&now-Date.parse(x.inputs.ev.t)>105*6e4&&now-Date.parse(x.inputs.ev.t)<30*864e5);
+    if(!due.length){ updateDue(); if(document.body.dataset.tab==='historial'&&!openId) renderHistory(); return; }
     const got=await pool(due,4,x=>eventData(x.inputs.ev.lg,x.inputs.ev.id,x.inputs.ev.t)); let n=0;
     let drop=0;
     due.forEach((x,i)=>{ const d=got[i]; if(!d||x.actual) return;
@@ -2014,6 +2038,7 @@ async function autoSettle(){
       else if(d.state==='post'&&x.auto){ x.drop=1; drop++; } });   // suspendido o cancelado
     if(drop){ state.history=state.history.filter(x=>!x.drop); if(!n){ persist(); renderRobot(); } }
     if(n){ relearn(); persist(); renderRobot(); if(current) analyze(current.m); toast(`El robot registró ${n} resultado${n>1?'s':''} y actualizó su aprendizaje`); }
+    else { updateDue(); if(document.body.dataset.tab==='historial'&&!openId) renderHistory(); }
   } catch(e){} finally{ settling=false; } }
 
 /* ---------- Pantalla del robot automático ---------- */
@@ -2129,7 +2154,8 @@ function renderHome(){ const k=kpiHtml();
 $('autoRecs').addEventListener('click',e=>{ const b=e.target.closest('button[data-aid]'); if(b) openAuto(b.dataset.aid,b); });
 try{ const r=JSON.parse(localStorage.getItem(LSA)); if(r&&r.ds===localDate()&&Array.isArray(r.items)) autoRun=r; }catch(e){}
 window.__autoReady=true; renderHome(); loadAuto();
-setTimeout(autoSettle,6000); setInterval(autoSettle,10*6e4);
+setTimeout(autoSettle,2500); setInterval(autoSettle,10*6e4);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) autoSettle(); });   // al volver a la app
 </script>
 </body>
 </html>

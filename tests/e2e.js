@@ -26,5 +26,14 @@ const viaCurl=r=>execFile('curl',['--silent','--show-error','--compressed','--ma
   await step('registro automático de resultados (partido ya jugado)',async()=>{ const r=await pg.evaluate(async()=>{ const ev=(await dayMatches('2026-11-08','esp.1')).find(x=>x.id==='401882816');
       const m=await buildInputs(ev); saveAutoPrediction(m,robotCompute(m)); await autoSettle(); const x=state.history.find(z=>z.inputs.ev&&z.inputs.ev.id==='401882816'); return x&&x.actual; });
     if(!r||r.h!==1||r.a!==2) throw new Error(JSON.stringify(r)); });
+  await step('pronósticos antiguos sin vínculo: se buscan en ESPN y se registran solos; solo avisa lo que ESPN no tiene',async()=>{
+    const r=await pg.evaluate(async()=>{ const base=state.history.find(z=>z.inputs.ev&&z.inputs.ev.id==='401882816');
+      const mk=(id,h,a,ko)=>{ const inp=JSON.parse(JSON.stringify(base.inputs)); delete inp.ev; inp.home.name=h; inp.away.name=a; inp.kickoff=ko; return {id,ts:Date.now(),date:ko.slice(0,10),inputs:inp,picks:base.picks,actual:null}; };
+      const ko=localIso(Date.parse('2026-11-08T20:00Z'));
+      state.history.unshift(mk('viejo1','ATLÉTICO DE MADRID','BARCELONA',ko), mk('inventado','Equipo Inventado','Otro Inventado',ko));
+      await autoSettle(); const v=state.history.find(z=>z.id==='viejo1'), w=state.history.find(z=>z.id==='inventado');
+      return {viejo:v.actual, vEv:!!v.inputs.ev, inv:!!w.noEspn, bar:document.getElementById('dueBar').hidden?'':document.getElementById('dueBar').textContent, n:state.history.filter(needsManual).length}; });
+    if(!r.viejo||r.viejo.h!==1||r.viejo.a!==2) throw new Error('el antiguo no se registró: '+JSON.stringify(r));
+    if(!r.inv||r.n!==1||!/no está en ESPN/.test(r.bar)) throw new Error('aviso incorrecto: '+JSON.stringify(r)); });
   await pg.screenshot({path:path.join(__dirname,'.cache','e2e.png')});
   console.log(errs.length?'Errores: '+errs.join(' | '):'Sin errores en la página'); await b.close(); process.exit(errs.length?1:0); })();

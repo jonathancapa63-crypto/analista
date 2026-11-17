@@ -8,7 +8,7 @@ const slice=(a,b)=>{ const i=SRC.indexOf(a), j=SRC.indexOf(b,i); if(i<0||j<0) th
 const engine=slice('/*ENGINE*/','/*END*/');
 const compute=slice('function robotCompute(m){','function analyze(m){');
 const auto=slice("const ESPN='https://site.api.espn.com","/* ---------- Registro automático de resultados");
-const actualSrc=slice('function actualOf(d){','let settling=false;');
+const actualSrc=slice('function actualOf(d){','let settling=false;')+slice('function sameTeam(','const kickOf=');
 const CACHE=path.join(__dirname,'.cache'); fs.mkdirSync(CACHE,{recursive:true});
 let net=0;
 function curlJSON(url){ const f=path.join(CACHE,crypto.createHash('md5').update(url).digest('hex')+'.json');
@@ -22,7 +22,7 @@ let state={theta:Object.assign({},THETA0),cal:{},prof:{},comp:{},history:[]};
 ${compute}
 ${auto.replace(/function getJSON\(url,ttl\)\{[\s\S]*?return pr; \}/,'function getJSON(url){ return __curl(url); }')}
 ${actualSrc}
-module.exports={marketGoals,THETA0,BOUNDS,SIGMA,PHI,STATS,predict,robotView,robotPicks,robotCompute,lambdas,statMeans,lineOver,countOver,calibrate,train,learnAll,trustCal,pickHit,lineRecord,record,confOf,teamKey,
+module.exports={sameTeam,marketGoals,THETA0,BOUNDS,SIGMA,PHI,STATS,predict,robotView,robotPicks,robotCompute,lambdas,statMeans,lineOver,countOver,calibrate,train,learnAll,trustCal,pickHit,lineRecord,record,confOf,teamKey,
   parseEvent,dayBoard,eventData,teamMatches,teamInputs,buildInputs,actualOf,pool,LEAGUES,etDaysLocal,etDaysTs,usToDec,
   getState:()=>state,setState:s=>{state=s;},CONF_MID,CONF_HI,PICK_MAX,PICKNAMES,extraMarkets};`;
 const mod={exports:{}};

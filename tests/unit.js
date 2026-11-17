@@ -44,6 +44,10 @@ t('0-0 sin estadísticas no cuenta como descanso conocido',()=>{ const e=ev(); c
 t('mismo equipo con distinta escritura',()=>{ for(const [a,b] of [['TURQUÍA','Turkey'],['ATLÉTICO DE MADRID','Atlético Madrid'],['Liga de las Naciones UEFA','Liga de Naciones UEFA'],['IRLANDA','Republic of Ireland']]) assert.strictEqual(H.teamKey(a),H.teamKey(b),a);
   assert.notStrictEqual(H.teamKey('Real Madrid'),H.teamKey('Real Sociedad')); });
 
+t('reconoce el mismo equipo para vincular con ESPN, sin confundir equipos distintos',()=>{
+  for(const [a,b] of [['U. de Chile','Universidad de Chile'],['COLO COLO','Colo-Colo'],['Atlético de Madrid','Atlético Madrid'],['Man City','Manchester City']]) assert.ok(H.sameTeam(a,b),a+' = '+b);
+  for(const [a,b] of [['Universidad Católica','Universidad de Chile'],['Real Madrid','Real Sociedad'],['Manchester City','Manchester United']]) assert.ok(!H.sameTeam(a,b),a+' ≠ '+b); });
+
 // --- Aprendizaje ---
 t('confianza aprendida dentro de sus límites y casi neutra con pocos datos',()=>{ const T=H.trustCal([{ts:Date.now(),actual:{h:0,a:0},picks:[{st:'goals',s:'total',l:2.5,o:1,p:0.8}]}]); assert.ok(T.goals.f<1&&T.goals.f>0.94,'f='+T.goals.f); });
 
