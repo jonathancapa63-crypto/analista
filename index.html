@@ -546,7 +546,7 @@ body:not([data-tab="analisis"]) .hteam b{font-size:18px}
 
 <script>
 /*ENGINE*/
-const APP_VERSION='v27 · 2026-11-17';
+const APP_VERSION='v28 · 2026-11-17';
 const TRAIN_MAX=500;        // partidos recientes que usa el ajuste de ponderaciones
 const MU = 1.35;            // goles promedio por equipo y partido (referencia)
 const RHO = -0.10;          // corrección Dixon-Coles para marcadores bajos
@@ -1729,7 +1729,8 @@ function renderHistory(){
   for(const id in keep){ const el=document.getElementById(id); if(el) el.value=keep[id]; }
 }
 function timeChip(x){ const s=matchState(x), k=kickTs(x);
-  if(s==='due') return needsManual(x)?'<span class="st due">No está en ESPN: escribe el resultado</span>':'<span class="st live">Terminado · el robot registrará el resultado solo</span>';
+  if(s==='due'){ if(needsManual(x)) return '<span class="st due">No está en ESPN: escribe el resultado</span>';
+    return isFinite(k)&&Date.now()-k>3*36e5?'<span class="st live">ESPN aún no publica el resultado · el robot lo registrará apenas aparezca</span>':'<span class="st live">Terminado · el robot registrará el resultado solo</span>'; }
   if(s==='live') return `<span class="st live">En juego · termina cerca de las ${hhmm(k+MATCH_LEN)}</span>`;
   if(s==='soon'){ const mins=Math.round((k-Date.now())/60000); return `<span class="st void">Comienza ${mins<60?'en '+Math.max(1,mins)+' min':localDate(new Date(k))===localDate()?'hoy a las '+hhmm(k):fmtDate(localDate(new Date(k)))+' a las '+hhmm(k)}</span>`; }
   return ''; }
