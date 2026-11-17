@@ -302,6 +302,51 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
 .rec .pp small{display:block;font-size:11px;font-weight:500;color:var(--muted)}
 .recs{display:flex;flex-direction:column;gap:8px;margin:6px 0 4px}
 @media (max-width:420px){ .am{grid-template-columns:44px 1fr} .am .ctl{grid-column:1/-1} }
+/* Navegación en 4 secciones + vistas internas */
+.subnav{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:-4px;position:sticky;top:0;z-index:5;background:var(--bg);padding:6px 0}
+.subnav::-webkit-scrollbar{display:none}
+.subnav .tab{flex:none}
+.maintabs button{font-size:11.5px}
+.maintabs svg{width:24px;height:24px}
+body:not([data-tab="analisis"]) .hero{padding:14px 14px 12px;gap:8px}
+body:not([data-tab="analisis"]) .hscore{font-size:52px}
+body:not([data-tab="analisis"]) .hteam b{font-size:18px}
+/* Inicio */
+.card.status{background:linear-gradient(135deg,rgba(255,211,77,.10),transparent 60%),var(--surface)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.kpi{background:var(--surface2);border-radius:14px;padding:10px 8px;text-align:center;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi b{font-family:var(--display);font-size:26px;font-weight:800;line-height:1}
+.kpi span{font-size:11.5px;color:var(--muted);line-height:1.2}
+.kpi.good b{color:var(--good)} .kpi.acc b{color:var(--accent)} .kpi.warn b{color:var(--warn)}
+.howto summary{cursor:pointer;font-weight:600;color:var(--accent);list-style:none;font-size:15px}
+.howto summary::-webkit-details-marker{display:none}
+.howto summary::after{content:" ›";display:inline-block;transition:transform .15s ease}
+.howto[open] summary::after{transform:rotate(90deg)}
+.steps{margin:10px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:8px;font-size:15px;max-width:68ch}
+.steps .good{color:var(--good);font-weight:600} .steps .acc{color:var(--accent);font-weight:600}
+.optrow{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end}
+.optrow .field{flex:1 1 200px}
+.daynav{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.daynav input{flex:1 1 140px;width:auto}
+.empty{text-align:left}
+/* Recomendaciones agrupadas por partido */
+.rgroup{background:var(--surface2);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.rgh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.rgh .t{font-family:var(--display);font-size:20px;font-weight:700;line-height:1.1;overflow-wrap:anywhere}
+.rgh small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.rpick{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;background:var(--bg);border-radius:12px;padding:9px 10px}
+.rpick .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.rpick.hi .dot{background:var(--good)}
+.rpick .w{font-weight:600;line-height:1.25}
+.rpick .w small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.rpick .pp{font-family:var(--display);font-size:24px;font-weight:800;text-align:right;line-height:1}
+.rpick .pp small{display:block;font-family:var(--body);font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}
+.rpick.hi .pp{color:var(--good)}
+.rsum{display:flex;gap:6px;flex-wrap:wrap}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+.am .tag2{display:block;margin-top:3px}
+@media (max-width:420px){ .kpis{grid-template-columns:repeat(2,1fr)} }
 </style>
 </head>
 <body>
@@ -311,15 +356,12 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
 </header>
 <button type="button" class="duebar" id="dueBar" hidden></button>
 <nav class="maintabs" id="mainTabs" role="tablist" aria-label="Secciones">
-  <button type="button" role="tab" data-go="partido"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/></svg><span>Partido</span></button>
-  <button type="button" role="tab" data-go="hoy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4M9 15l2 2 4-4"/></svg><span>Hoy</span></button>
-  <button type="button" role="tab" data-go="analisis"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Análisis</span></button>
-  <button type="button" role="tab" data-go="lineas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-6 4 3 6-8M3 21h18"/></svg><span>Líneas</span></button>
-  <button type="button" role="tab" data-go="robot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 8V4M9 13h.01M15 13h.01M10 16h4"/></svg><span>Robot</span></button>
-  <button type="button" role="tab" data-go="historial" id="tabHist"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>Historial</span><b class="badge" id="histBadge" hidden></b></button>
-  <button type="button" role="tab" data-go="rvm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/></svg><span>Mercado</span></button>
-  <button type="button" role="tab" data-go="memoria"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-4 10.5V17h8v-3.5A6 6 0 0 0 12 3zM9 21h6"/></svg><span>Memoria</span></button>
+  <button type="button" role="tab" data-nav="inicio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg><span>Inicio</span></button>
+  <button type="button" role="tab" data-nav="partido"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/></svg><span>Partido</span></button>
+  <button type="button" role="tab" data-nav="historial" id="tabHist"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>Historial</span><b class="badge" id="histBadge" hidden></b></button>
+  <button type="button" role="tab" data-nav="robot"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 8V4M9 13h.01M15 13h.01M10 16h4"/></svg><span>Robot</span></button>
 </nav>
+<div class="subnav" id="subNav" role="tablist" aria-label="Vistas" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <datalist id="teamList"></datalist>
@@ -327,6 +369,7 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
   <div class="head"><h2>Datos del partido</h2>
     <button type="button" id="btnDemo" class="mini">Cargar ejemplo</button></div>
   <div class="prog" aria-hidden="true"><i id="formProg"></i></div>
+  <p class="small muted" style="max-width:65ch">Los partidos que eliges en Inicio llegan aquí con todos sus datos. Puedes revisarlos o corregirlos y volver a analizar. Para un partido que no está en la lista, ingrésalo a mano.</p>
   <p class="small muted" id="formProgTxt">Copia las estadísticas de tu app para el local y el visitante.</p>
 
   <div class="teams">
@@ -401,37 +444,64 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
   </div>
 </form>
 
-<div class="card" id="noAnalysis" data-pane="analisis lineas robot">
-  <h2>Sin análisis todavía</h2>
-  <p class="muted">Ingresa los datos en la pestaña Partido y pulsa "Analizar partido". También puedes abrir uno de los partidos de la pestaña Hoy.</p>
-  <div class="actions"><button type="button" data-go="partido">Ir a Partido</button></div>
+<div class="card empty" id="noAnalysis" data-pane="analisis lineas robot">
+  <h2>Todavía no eliges un partido</h2>
+  <p class="muted" style="max-width:60ch">Ve a Inicio y toca "Analizar" en cualquier partido del día: el robot junta todos los datos solo. Si el partido no aparece en la lista, puedes ingresar sus datos a mano.</p>
+  <div class="actions"><button type="button" class="primary" data-go="hoy">Elegir un partido del día</button><button type="button" data-go="partido">Ingresar datos a mano</button></div>
 </div>
 <section id="results" hidden style="display:contents"></section>
 
-<section class="card robot" data-pane="hoy" id="autoCard">
-  <div class="head"><h2>Partidos del día · automático</h2><span class="small muted" id="autoCount"></span></div>
-  <p class="small muted" style="max-width:68ch">El robot descarga solo los partidos, las estadísticas de los últimos 10 partidos de cada equipo y las cuotas. Toca "Analizar" en un partido o deja que el robot revise todos y te muestre solo las jugadas de confianza alta o media.</p>
-  <div class="autobar">
-    <div class="field"><label for="autoDate">Fecha</label><input type="date" id="autoDate"></div>
-    <div class="field"><label for="autoLeague">Competición</label><select id="autoLeague"><option value="">Todas</option></select></div>
-    <div class="field"><label for="autoMin">Mostrar jugadas</label><select id="autoMin"><option value="mid">Confianza alta y media</option><option value="hi">Solo confianza alta</option></select></div>
+<section class="card status" data-pane="hoy" id="homeStatus">
+  <div class="who">
+    <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><rect x="7" y="13" width="30" height="22" rx="6" fill="none" stroke="#ffd34d" stroke-width="2.5"/><circle cx="16" cy="23" r="3" fill="#ffd34d"/><circle cx="28" cy="23" r="3" fill="#ffd34d"/><path d="M17 30h10M22 13V7" stroke="#ffd34d" stroke-width="2.5" stroke-linecap="round"/><circle cx="22" cy="5.5" r="2.5" fill="#ffd34d"/></svg>
+    <div><h2 id="homeHello">Tu robot analista</h2><span class="small muted" id="homeLine"></span></div>
   </div>
-  <label class="check" for="autoSave"><input type="checkbox" id="autoSave" checked> Guardar los pronósticos del robot automático para que aprenda solo con los resultados</label>
-  <div class="actions"><button type="button" class="primary" id="btnAutoRun">Robot: analizar todos y recomendar</button><button type="button" id="btnAutoLoad">Actualizar partidos</button></div>
+  <div class="kpis" id="homeKpis"></div>
+  <details class="howto" id="howto">
+    <summary>¿Cómo funciona?</summary>
+    <ol class="steps">
+      <li><b>Pide recomendaciones.</b> Pulsa "Analizar los partidos" y el robot revisa todos los partidos que faltan por jugarse.</li>
+      <li><b>Elige tus jugadas.</b> Solo verás jugadas de confianza <span class="good">alta</span> (70% o más) o <span class="acc">media</span> (60% a 69%). Apuesta solo si tu casa paga más que la cuota justa.</li>
+      <li><b>El robot aprende solo.</b> Cuando terminan los partidos, registra resultados, córners, remates y tarjetas, y corrige su confianza. Solo abre la app de vez en cuando.</li>
+    </ol>
+  </details>
+</section>
+
+<section class="card robot" data-pane="hoy" id="autoCard">
+  <div class="head"><h2>Recomendaciones del robot</h2><span class="pill acc" id="recDay"></span></div>
+  <div class="actions"><button type="button" class="primary" id="btnAutoRun">Analizar los partidos</button></div>
+  <div class="optrow">
+    <div class="field"><label for="autoMin">Mostrar</label><select id="autoMin"><option value="mid">Confianza alta y media</option><option value="hi">Solo confianza alta</option></select></div>
+    <label class="check" for="autoSave"><input type="checkbox" id="autoSave" checked> Guardar para que el robot aprenda solo</label>
+  </div>
   <span class="small muted" id="autoMsg" role="status" aria-live="polite"></span>
   <div id="autoRecs"></div>
+</section>
+
+<section class="card" data-pane="hoy" id="dayCard">
+  <div class="head"><h2>Partidos del día</h2><span class="small muted" id="autoCount"></span></div>
+  <div class="daynav" role="group" aria-label="Elegir día">
+    <button type="button" class="tab" data-dshift="-1">Ayer</button><button type="button" class="tab" data-dshift="0">Hoy</button><button type="button" class="tab" data-dshift="1">Mañana</button>
+    <input type="date" id="autoDate" aria-label="Otra fecha">
+  </div>
+  <div class="optrow">
+    <div class="field"><label for="autoLeague">Competición</label><select id="autoLeague"><option value="">Todas</option></select></div>
+    <button type="button" class="mini" id="btnAutoLoad">Actualizar</button>
+  </div>
+  <p class="small muted">Toca "Analizar" para ver el análisis completo de un partido. El robot junta solo los últimos 10 partidos de cada equipo y las cuotas.</p>
   <div class="hist" id="autoList"></div>
 </section>
 
 <section class="card" data-pane="hoy">
-  <div class="head"><h2>Partidos de hoy</h2><span class="small muted" id="hoyCount"></span></div>
-  <p class="small muted" style="max-width:65ch">Cada partido que analizas (a mano o automático) queda aquí durante dos días con todos sus datos. Ábrelo cuando quieras para volver a ver el análisis o buscar otra jugada, sin escribir nada de nuevo.</p>
+  <div class="head"><h2>Abiertos recientemente</h2><span class="small muted" id="hoyCount"></span></div>
+  <p class="small muted" style="max-width:65ch">Los partidos que abres quedan aquí dos días, para volver a verlos sin esperar.</p>
   <div class="hist" id="today"></div>
+  <div class="actions"><button type="button" class="mini" data-go="partido">+ Ingresar un partido a mano</button></div>
 </section>
 
 <section class="card" data-pane="historial">
   <div class="head"><h2>Historial</h2></div>
-  <p class="small muted">Guarda cada pronóstico desde la pestaña Robot y, cuando termine el partido, registra aquí el resultado con sus estadísticas. Con cada partido el robot reajusta sus ponderaciones y sus líneas.</p>
+  <p class="small muted" style="max-width:65ch">Aquí quedan todos los pronósticos guardados. Los del robot automático registran su resultado solos cuando termina el partido; solo los que ingresaste a mano necesitan que escribas el resultado.</p>
   <div class="custom">
     <div class="field"><label for="histQ">Buscar equipo o competición</label><input type="text" id="histQ" autocomplete="off"></div>
     <label class="check" for="histPend" style="align-self:end;padding-bottom:9px"><input type="checkbox" id="histPend"> Solo pendientes</label>
@@ -446,7 +516,7 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
   <div class="head">
     <div class="who">
       <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><rect x="7" y="13" width="30" height="22" rx="6" fill="none" stroke="#f5d547" stroke-width="2.5"/><circle cx="16" cy="23" r="3" fill="#f5d547"/><circle cx="28" cy="23" r="3" fill="#f5d547"/><path d="M17 30h10M22 13V7" stroke="#f5d547" stroke-width="2.5" stroke-linecap="round"/><circle cx="22" cy="5.5" r="2.5" fill="#f5d547"/><path d="M3 21v8M41 21v8" stroke="#f5d547" stroke-width="2.5" stroke-linecap="round"/></svg>
-      <div><h2>Memoria del robot</h2><span class="small muted" id="robotLevel"></span></div>
+      <div><h2>Lo que el robot aprendió</h2><span class="small muted" id="robotLevel"></span></div>
     </div>
   </div>
   <div id="robotStats"></div>
@@ -476,7 +546,7 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
 
 <script>
 /*ENGINE*/
-const APP_VERSION='v23 · 2026-11-17';
+const APP_VERSION='v24 · 2026-11-17';
 const TRAIN_MAX=500;        // partidos recientes que usa el ajuste de ponderaciones
 const MU = 1.35;            // goles promedio por equipo y partido (referencia)
 const RHO = -0.10;          // corrección Dixon-Coles para marcadores bajos
@@ -938,7 +1008,7 @@ function updatePcts(){
   for(const s of ['h','a']){ const n=val(s+'_n');
     for(const [k] of RES){ const v=val(s+'_'+k); $(s+'_'+k+'_p').textContent=(n>0&&v!==null&&v<=n)?Math.round(v/n*100)+'%':''; } }
   let req=2, got=($('h_n').value.trim()?1:0)+($('a_n').value.trim()?1:0);
-  document.querySelectorAll('details.sec').forEach(d=>{ const ins=[...d.querySelectorAll('input')].filter(i=>!/pen(Scored|Taken)$/.test(i.id)), f=ins.filter(i=>i.value.trim()!=='').length;
+  document.querySelectorAll('#form details.sec').forEach(d=>{ const ins=[...d.querySelectorAll('input')].filter(i=>!/pen(Scored|Taken)$/.test(i.id)), f=ins.filter(i=>i.value.trim()!=='').length;
     const sc=d.querySelector('.sc'); sc.textContent=f+' de '+ins.length; sc.classList.toggle('full',f===ins.length);
     if(d.dataset.req){ req+=ins.length; got+=f; } });
   $('formProg').style.width=(got/req*100).toFixed(0)+'%';
@@ -992,7 +1062,7 @@ function readForm(){
   if(filled===3){ if(o.some(v=>!(v>1))){ ['o1','ox','o2'].forEach(i=>bad.add(i)); errs.push('Las cuotas deben ser decimales mayores que 1.'); } else m.odds=o; }
   else if(filled>0){ ['o1','ox','o2'].forEach(i=>{ if(val(i)===null) bad.add(i); }); errs.push('Para detectar valor ingresa las tres cuotas (1, X y 2) o deja las tres vacías.'); }
   document.querySelectorAll('#form input').forEach(i=>i.classList.toggle('err',bad.has(i.id)));
-  document.querySelectorAll('details.sec').forEach(d=>{ if(d.querySelector('.err')) d.open=true; });
+  document.querySelectorAll('#form details.sec').forEach(d=>{ if(d.querySelector('.err')) d.open=true; });
   if(errs.length){ $('errors').innerHTML='<b>No se puede analizar todavía</b><ul>'+errs.map(e=>'<li>'+esc(e)+'</li>').join('')+'</ul>'; $('errors').hidden=false; return null; }
   $('errors').hidden=true;
   if(formEv&&formEv.h===teamKey(m.home.name)&&formEv.a===teamKey(m.away.name)) m.ev=formEv.ev;
@@ -1000,11 +1070,22 @@ function readForm(){
 }
 
 /* ---------- Pestañas principales ---------- */
-function setTab(t){ document.body.dataset.tab=t;
-  document.querySelectorAll('#mainTabs button').forEach(b=>{ const on=b.dataset.go===t; b.classList.toggle('on',on); b.setAttribute('aria-selected',on?'true':'false'); });
+// Cuatro secciones. "Partido" y "Robot" tienen vistas internas (subpestañas)
+const GROUPS={inicio:['hoy'],partido:['robot','analisis','lineas','partido'],historial:['historial'],robot:['memoria','rvm']};
+const VIEWNAME={robot:'Jugadas del robot',analisis:'Resumen',lineas:'Líneas y mercados',partido:'Datos',memoria:'Aprendizaje',rvm:'Robot vs. casa de apuestas'};
+const lastView={};
+const groupOf=v=>Object.keys(GROUPS).find(g=>GROUPS[g].indexOf(v)>=0)||'inicio';
+function setTab(t){ if(!VIEWNAME[t]&&!GROUPS[groupOf(t)].includes(t)) t='hoy';
+  const g=groupOf(t); lastView[g]=t; document.body.dataset.tab=t; document.body.dataset.group=g;
+  document.querySelectorAll('#mainTabs button').forEach(b=>{ const on=b.dataset.nav===g; b.classList.toggle('on',on); b.setAttribute('aria-selected',on?'true':'false'); });
+  const views=GROUPS[g], sn=$('subNav');
+  if(views.length>1){ sn.hidden=false; sn.innerHTML=views.map(v=>`<button type="button" role="tab" class="tab${v===t?' on':''}" data-go="${v}" aria-selected="${v===t}">${VIEWNAME[v]}</button>`).join(''); }
+  else { sn.hidden=true; sn.innerHTML=''; }
   window.scrollTo(0,0); }
-document.addEventListener('click',e=>{ const b=e.target.closest('[data-go]'); if(b){ setTab(b.dataset.go); haptic(); } });
-setTab('partido');
+document.addEventListener('click',e=>{ const n=e.target.closest('[data-nav]');
+  if(n){ const g=n.dataset.nav; setTab(lastView[g]||(g==='partido'?(current?'robot':'partido'):GROUPS[g][0])); haptic(); return; }
+  const b=e.target.closest('[data-go]'); if(b){ setTab(b.dataset.go); haptic(); } });
+setTab('hoy');
 
 /* ---------- Estado y memoria del robot ---------- */
 let state={v:1,theta:Object.assign({},THETA0),history:[],updatedAt:0};
@@ -1230,7 +1311,7 @@ function analyze(m){
   const off=x=>clamp(Math.round(x/MU*50),0,100), sol=x=>clamp(Math.round(100-x/MU*50),0,100);
   const trend=b.o25>=0.58?'Alta':b.o25<=0.44?'Baja':'Media';
   let html=`
-  <div class="hero" data-pane="analisis">
+  <div class="hero" data-pane="analisis robot lineas">
     <svg class="pitch" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path d="M200 0v200M0 0h400v200H0z"/><circle cx="200" cy="100" r="46"/><path d="M0 50h56v100H0M400 50h-56v100h56"/></svg>
     <div class="hteams">
       <div class="hteam"><b class="hc">${hn}</b><small>${f2(b.lh)} goles esperados</small></div>
@@ -1437,7 +1518,7 @@ function renderLines(){
 }
 $('form').addEventListener('submit',e=>{ e.preventDefault(); const m=readForm();
   if(!m){ $('errors').scrollIntoView({block:'center',behavior:'smooth'}); return; }
-  analyze(m); saveDraft(m); linkSaved(); setTab('analisis'); });
+  analyze(m); saveDraft(m); linkSaved(); setTab('robot'); });
 
 function slim(p){ const r=x=>Math.round(x*1e4)/1e4; return {p1:r(p.p1),px:r(p.px),p2:r(p.p2),o25:r(p.o25),btts:r(p.btts)}; }
 function savePrediction(){
@@ -1448,7 +1529,7 @@ function savePrediction(){
     inputs:JSON.parse(JSON.stringify(m)),base:slim(b),robot:slim(r),score:b.top[0].h+'-'+b.top[0].a,actual:null});
   state.history=state.history.slice(0,HIST_MAX); persist(); renderRobot();
   toast('Pronóstico guardado en el historial');
-  $('btnSave').disabled=true; $('saveMsg').textContent='Guardado. Cuando termine el partido, registra el resultado y las estadísticas en la pestaña Historial.';
+  $('btnSave').disabled=true; $('saveMsg').textContent=m.ev?'Guardado. Cuando termine el partido, el robot registrará el resultado solo.':'Guardado. Cuando termine el partido, registra el resultado en Historial.';
 }
 
 /* ---------- Panel del robot ---------- */
@@ -1458,19 +1539,21 @@ function renderRobot(){
   const lvl=n>=50?'Experto':n>=20?'Analista':n>=5?'Aprendiz':'Novato';
   $('robotLevel').textContent=`Nivel ${lvl} · ${n} partido${n===1?'':'s'} aprendido${n===1?'':'s'}`+(pend?` · ${pend} pendiente${pend===1?'':'s'}`:'');
   let h='';
-  h+=`<div class="tablewrap"><table class="plain"><thead><tr><th>Lo que el robot ha aprendido</th><th>De fábrica</th><th>Ahora</th></tr></thead><tbody>${
+  if(typeof kpiHtml==='function') h+=`<div class="kpis" style="margin-bottom:14px">${kpiHtml().html}</div>`;
+  const adv=`<details class="sec" style="margin-top:10px"><summary><span>Ajustes técnicos del modelo</span></summary><div class="tablewrap"><table class="plain"><thead><tr><th>Lo que el robot ha aprendido</th><th>De fábrica</th><th>Ahora</th></tr></thead><tbody>${
     Object.keys(PNAMES).map(k=>{ const [l,f]=PNAMES[k], ch=Math.abs(state.theta[k]-THETA0[k])>1e-6;
-      return `<tr><td>${l}</td><td class="muted">${f(THETA0[k])}</td><td style="${ch?'color:var(--accent);font-weight:600':''}">${f(state.theta[k])}</td></tr>`; }).join('')}</tbody></table></div>`;
+      return `<tr><td>${l}</td><td class="muted">${f(THETA0[k])}</td><td style="${ch?'color:var(--accent);font-weight:600':''}">${f(state.theta[k])}</td></tr>`; }).join('')}</tbody></table></div></details>`;
   const lr=lineRecord(state.history), tot=Object.values(lr).reduce((a,v)=>({n:a.n+v.n,ok:a.ok+v.ok}),{n:0,ok:0}), cal=state.cal||{};
-  h+=`<div class="tablewrap" style="margin-top:12px"><table class="plain"><thead><tr><th>Líneas del robot${tot.n?` · ${pc(tot.ok/tot.n)} de acierto`:''}</th><th>Aciertos</th><th>Ajuste aprendido</th><th>Confianza aprendida</th></tr></thead><tbody>${
+  h+=`<h3>Aciertos por tipo de jugada</h3><div class="tablewrap"><table class="plain"><thead><tr><th>Jugadas del robot${tot.n?` · ${pc(tot.ok/tot.n)} de acierto`:''}</th><th>Aciertos</th><th>Ajuste aprendido</th><th>Confianza aprendida</th></tr></thead><tbody>${
     Object.keys(PICKNAMES).map(k=>{ const l=PICKNAMES[k], is2=k==='h2g', isHt=k==='htg'||k==='htr'||is2, c=isHt?(cal.ht||0.45):(cal[k]||1), ch=isHt?Math.abs(c-0.45)>0.004:(k!=='goals'&&Math.abs(c-1)>0.005);
       return `<tr><td>${l}</td><td>${lr[k].n?lr[k].ok+' de '+lr[k].n:'<span class="muted">Sin datos</span>'}</td><td style="${ch?'color:var(--accent);font-weight:600':''}">${k==='goals'?'<span class="muted">Usa el modelo de goles</span>':is2?pc(1-c)+' de los goles en el 2T':isHt?pc(c)+' de los goles en el 1T':'×'+f2(c)}</td><td>${(()=>{ const t=cal.trust&&cal.trust[k]; if(!t||!t.n) return '<span class="muted">Sin datos</span>'; const d=Math.abs(t.f-1)>0.005; return `<span style="${d?'color:'+(t.f<1?'var(--bad)':'var(--good)')+';font-weight:600':''}">×${f2(t.f)}</span>`; })()}</td></tr>`; }).join('')}</tbody></table></div><p class="small muted">Confianza aprendida: si en un mercado el robot acierta menos de lo que promete, baja sus probabilidades ahí (×0.90 = 10% menos) y deja de recomendar jugadas dudosas; si acierta más, las sube un poco.</p>`;
   const teams=Object.values(state.prof||{}).sort((x,y)=>y.n-x.n).slice(0,40);
-  if(teams.length) h+=`<div class="tablewrap" style="margin-top:12px"><table class="plain"><thead><tr><th>Equipos que conozco</th><th>Partidos</th><th>Ataque</th><th>Goles recibidos</th><th>1T: marca / recibe</th><th>Córners: genera / concede</th><th>Aciertos</th></tr></thead><tbody>${
-    teams.map(T=>`<tr><td>${esc(T.name)}</td><td>${T.n}</td><td>×${f2(T.att)}</td><td>×${f2(T.def)}</td><td>${pc(T.s1f)} / ${pc(T.s1a)}</td><td>×${f2(T.cf.corners)} / ×${f2(T.ca.corners)}</td><td>${T.rn?T.ok+' de '+T.rn:''}</td></tr>`).join('')}</tbody></table></div><p class="small muted">Ataque y goles recibidos comparan lo que hizo cada equipo con lo que proyectaba el modelo (×1.00 es igual a lo proyectado). Con pocos partidos el ajuste es pequeño a propósito.</p>`;
+  if(teams.length) h+=`<details class="sec" style="margin-top:10px"><summary><span>Equipos que conozco <small>${teams.length}</small></span></summary><div class="tablewrap"><table class="plain"><thead><tr><th>Equipos que conozco</th><th>Partidos</th><th>Ataque</th><th>Goles recibidos</th><th>1T: marca / recibe</th><th>Córners: genera / concede</th><th>Aciertos</th></tr></thead><tbody>${
+    teams.map(T=>`<tr><td>${esc(T.name)}</td><td>${T.n}</td><td>×${f2(T.att)}</td><td>×${f2(T.def)}</td><td>${pc(T.s1f)} / ${pc(T.s1a)}</td><td>×${f2(T.cf.corners)} / ×${f2(T.ca.corners)}</td><td>${T.rn?T.ok+' de '+T.rn:''}</td></tr>`).join('')}</tbody></table></div><p class="small muted">Ataque y goles recibidos comparan lo que hizo cada equipo con lo que proyectaba el modelo (×1.00 es igual a lo proyectado). Con pocos partidos el ajuste es pequeño a propósito.</p></details>`;
   const comps=Object.values(state.comp||{}).sort((x,y)=>y.n-x.n).slice(0,30);
-  if(comps.length) h+=`<div class="tablewrap" style="margin-top:12px"><table class="plain"><thead><tr><th>Competiciones que conozco</th><th>Partidos</th><th>Goles frente a lo proyectado</th><th>Aciertos</th></tr></thead><tbody>${
-    comps.map(c=>`<tr><td>${esc(c.name)}</td><td>${c.n}</td><td>×${f2(c.f)}</td><td>${c.rn?c.ok+' de '+c.rn:''}</td></tr>`).join('')}</tbody></table></div>`;
+  if(comps.length) h+=`<details class="sec" style="margin-top:10px"><summary><span>Competiciones que conozco <small>${comps.length}</small></span></summary><div class="tablewrap"><table class="plain"><thead><tr><th>Competiciones que conozco</th><th>Partidos</th><th>Goles frente a lo proyectado</th><th>Aciertos</th></tr></thead><tbody>${
+    comps.map(c=>`<tr><td>${esc(c.name)}</td><td>${c.n}</td><td>×${f2(c.f)}</td><td>${c.rn?c.ok+' de '+c.rn:''}</td></tr>`).join('')}</tbody></table></div></details>`;
+  h+=adv;
   $('compList').innerHTML=comps.map(c=>`<option value="${esc(c.name)}">`).join('');
   $('teamList').innerHTML=teams.map(T=>`<option value="${esc(T.name)}">`).join('');
   const used=state.history.length/HIST_MAX;
@@ -1479,6 +1562,7 @@ function renderRobot(){
   updateDue();
   renderRvm();
   renderToday();
+  if(window.__autoReady){ renderHome(); if(autoDay.length) renderAutoList(); }
   renderHistory();
 }
 /* ---------- Partidos de hoy ---------- */
@@ -1503,7 +1587,7 @@ function renderToday(){
   const box=$('today'), list=freshToday(state.today), day=localDate();
   const mine=list.filter(d=>localDate(new Date(d.ts))===day);
   $('hoyCount').textContent=mine.length?mine.length+' analizado'+(mine.length===1?'':'s')+' hoy':'';
-  if(!list.length){ box.innerHTML='<p class="muted small">Todavía no analizas partidos hoy. Ingresa los datos en la pestaña Partido y pulsa "Analizar partido": quedará guardado aquí automáticamente.</p>'; return; }
+  if(!list.length){ box.innerHTML='<p class="muted small">Todavía no abres partidos. Toca "Analizar" en un partido del día y quedará aquí.</p>'; return; }
   const item=d=>{ const m=d.inputs, hn=esc(m.home.name), an=esc(m.away.name), p=predict(m,THETA0), q=round3(p), t=p.top[0], tm=new Date(d.ts);
     const saved=d.savedId&&state.history.find(x=>x.id===d.savedId);
     return `<div class="h-item"><div><div class="t">${hn} vs ${an}</div>
@@ -1519,7 +1603,7 @@ $('today').addEventListener('click',e=>{ const b=e.target.closest('button[data-t
   if(b.dataset.tact==='edit'){ setTab('partido'); return; }
   const m=readForm(); if(!m){ setTab('partido'); return; }
   analyze(m); linkSaved();
-  setTab('analisis');
+  setTab('robot');
 });
 
 /* ---------- Robot vs Mercado ---------- */
@@ -1574,7 +1658,7 @@ function renderRvm(){
       <div class="tile"><span class="k">Porcentaje de acierto</span><div class="vv num"><span>${P(bs.won,bs.won+bs.lost)}</span></div></div></div>
     <div class="tablewrap"><table class="plain"><thead><tr><th>Acierto por tipo de jugada</th><th>Jugadas</th><th>Acertadas</th><th>Acierto</th></tr></thead><tbody>${
       Object.keys(F).sort((u,v)=>F[v].n-F[u].n).map(k=>`<tr><td>${k}${few(F[k].n)}</td><td>${F[k].n}</td><td>${F[k].w}</td><td>${P(F[k].w,F[k].n)}</td></tr>`).join('')}</tbody></table></div>`
-      :'<p class="muted" style="max-width:65ch">Todavía no hay combinadas cerradas. Ármalas en la pestaña Robot después de analizar un partido; se cierran solas al ingresar el resultado.</p>')+'</div>';
+      :'<p class="muted" style="max-width:65ch">Todavía no hay combinadas cerradas. Ármalas en Partido › Jugadas del robot después de analizar un partido; se cierran solas al ingresar el resultado.</p>')+'</div>';
   box.innerHTML=h;
 }
 /* ---------- Partidos terminados sin resultado ---------- */
@@ -1599,7 +1683,7 @@ function renderHistory(){
   if(pend){ const o={due:0,live:1,soon:2,nodate:3}; all.sort((u,v)=>(o[matchState(u)]-o[matchState(v)])||((kickTs(u)||0)-(kickTs(v)||0))); }   // primero los que ya terminaron
   $('histMore').hidden=all.length<=histShow; $('histMore').textContent=`Mostrar más partidos (${Math.max(0,all.length-histShow)} restantes)`;
   if(state.history.length&&!all.length){ hist.innerHTML='<p class="muted small">Ningún partido coincide con la búsqueda.</p>'; return; }
-  if(!state.history.length){ hist.innerHTML='<p class="muted small">Aún no hay pronósticos guardados. Analiza un partido y, en la pestaña Robot, pulsa "Guardar pronóstico en el historial".</p>'; return; }
+  if(!state.history.length){ hist.innerHTML='<p class="muted small">Aún no hay pronósticos guardados. Pide recomendaciones en Inicio (se guardan solas) o abre un partido y pulsa "Guardar pronóstico en el historial".</p>'; return; }
   // Si el formulario de resultado está abierto, se conserva lo escrito aunque la lista se vuelva a dibujar (por ejemplo, al terminar de sincronizar)
   const keep={}; hist.querySelectorAll('.rpanel input').forEach(i=>{ keep[i.id]=i.value; });
   hist.innerHTML=all.slice(0,histShow).map(x=>{ const hn=esc(x.inputs.home.name), an=esc(x.inputs.away.name), a=x.actual, c=comboOf(x.bets,x.stake,a,x.fo);
@@ -1897,32 +1981,46 @@ const hhmmL=iso=>{ const d=new Date(iso); return String(d.getHours()).padStart(2
 const pickText=(pk,hn,an)=>{ const nm=PICKNAMES[pk.st]||pk.st;
   if(pk.st==='htr') return nm+' · '+(pk.r.length>1?{'1X':hn+' o empate','X2':an+' o empate','12':'Sin empate'}[pk.r]:{'1':'Gana '+hn,'X':'Empate','2':'Gana '+an}[pk.r]);
   return nm+' · '+({total:'Partido',home:hn,away:an}[pk.s]||'Partido')+' · '+(pk.o?'Más de ':'Menos de ')+pk.l.toFixed(1); };
+// Cómo se nombra el día elegido: "hoy", "mañana", "ayer" o la fecha
+const dayWord=ds=>{ const d=new Date(ds+'T12:00'), t=new Date(localDate()+'T12:00'), k=Math.round((d-t)/864e5);
+  return k===0?'hoy':k===1?'mañana':k===-1?'ayer':d.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'}); };
+const shiftDay=k=>{ const d=new Date(localDate()+'T12:00'); d.setDate(d.getDate()+k); return localDate(d); };
+function syncDay(){ const ds=$('autoDate').value||localDate(), w=dayWord(ds);
+  document.querySelectorAll('[data-dshift]').forEach(b=>b.classList.toggle('on',shiftDay(Number(b.dataset.dshift))===ds));
+  $('recDay').textContent=w.charAt(0).toUpperCase()+w.slice(1);
+  if(!$('btnAutoRun').disabled) $('btnAutoRun').textContent=`Analizar los partidos de ${w}`; }
+// Estado de cada partido en la memoria del robot (guardado / acertado)
+function savedOf(id){ return state.history.find(x=>x.inputs&&x.inputs.ev&&x.inputs.ev.id===id); }
 function renderAutoList(){
   const box=$('autoList'), list=autoDay;
   $('autoCount').textContent=list.length?list.length+' partido'+(list.length===1?'':'s'):'';
   if(!list.length){ box.innerHTML='<p class="small muted">No hay partidos para esta fecha en las competiciones elegidas.</p>'; return; }
   let h='', last='';
   for(const m of list){ if(m.lname!==last){ h+=`<div class="lg">${esc(m.lname)}</div>`; last=m.lname; }
-    const live=m.state==='in', fin=m.state==='post', sc=live||fin;
+    const live=m.state==='in', fin=m.state==='post', sc=live||fin, sv=savedOf(m.id);
     const tm=fin?`<span class="pill">${esc(m.detail||'Final')}</span>`:live?`<span class="pill bad">En vivo</span><small>${esc(m.detail)}</small>`:`${hhmmL(m.t)}${m.odds?'<small>con cuotas</small>':''}`;
     const row=(t)=>`<span>${t.logo?`<img src="${esc(t.logo)}" alt="" loading="lazy">`:''}${esc(t.name)}${sc?`<b>${t.score}</b>`:''}</span>`;
-    h+=`<div class="am"><div class="tm">${tm}</div><div class="tt">${row(m.home)}${row(m.away)}</div><div class="ctl"><button type="button" class="mini" data-aid="${esc(m.id)}">Analizar</button></div></div>`; }
+    let tag=''; if(sv){ if(sv.actual){ const hs=(sv.picks||[]).filter(pk=>pk.p>=CONF_MID).map(pk=>pickHit(pk,sv.actual)).filter(z=>z!==null);
+        tag=`<span class="pill good tag2">Aprendido${hs.length?` · acertó ${hs.filter(Boolean).length} de ${hs.length}`:''}</span>`; }
+      else tag='<span class="pill acc tag2">Pronóstico guardado</span>'; }
+    h+=`<div class="am"><div class="tm">${tm}</div><div class="tt">${row(m.home)}${row(m.away)}${tag}</div><div class="ctl"><button type="button" class="mini" data-aid="${esc(m.id)}">Analizar</button></div></div>`; }
   box.innerHTML=h; }
 async function loadAuto(){
   const ds=$('autoDate').value||localDate(), lg=$('autoLeague').value;
-  const seq=++autoSeq; $('autoMsg').textContent='Descargando partidos…'; $('btnAutoLoad').disabled=true;
-  try{ const list=await dayMatches(ds,lg); if(seq!==autoSeq) return; autoDay=list; $('autoMsg').textContent=autoDay.length?`Actualizado ${hhmmL(new Date().toISOString())}.`:'';
-  }catch(e){ if(seq!==autoSeq) return; autoDay=[]; $('autoMsg').textContent='No se pudieron descargar los partidos. Revisa tu conexión e intenta otra vez.'; }
-  $('btnAutoLoad').disabled=false; renderAutoList(); renderRecs(); }
+  const seq=++autoSeq; syncDay(); $('autoCount').textContent=''; $('autoList').innerHTML='<p class="small muted">Descargando partidos…</p>'; $('btnAutoLoad').disabled=true;
+  try{ const list=await dayMatches(ds,lg); if(seq!==autoSeq) return; autoDay=list; renderAutoList();
+  }catch(e){ if(seq!==autoSeq) return; autoDay=[]; $('autoList').innerHTML='<p class="small" style="color:var(--bad)">No se pudieron descargar los partidos. Revisa tu conexión y pulsa "Actualizar".</p>'; $('autoCount').textContent=''; }
+  $('btnAutoLoad').disabled=false; renderRecs(); }
+document.querySelector('.daynav').addEventListener('click',e=>{ const b=e.target.closest('[data-dshift]'); if(!b) return; $('autoDate').value=shiftDay(Number(b.dataset.dshift)); loadAuto(); });
 async function openAuto(id,btn){
   const ev=autoDay.find(x=>x.id===id)||((autoRun&&autoRun.evs)||[]).find(x=>x.id===id); if(!ev) return;
   const cached=autoRun&&autoRun.ms&&autoRun.ms[id];
   const lbl=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Recopilando…'; }
   try{ const m=cached||await buildInputs(ev); if(ev.odds&&!m.odds) m.odds=ev.odds;
     toForm(m); const v=readForm(); if(!v){ setTab('partido'); return; }
-    analyze(v); saveDraft(v); linkSaved(); setTab('analisis');
+    analyze(v); saveDraft(v); linkSaved(); setTab('robot');
     toast(m.home.estimated||m.away.estimated?'Datos cargados. Esta liga no publica remates ni córners: se usan promedios generales.':'Datos cargados automáticamente');
-  }catch(e){ toast('No se pudo armar el análisis: '+(e.message||'error de conexión')); }
+  }catch(e){ console.error(e); toast('No se pudo armar el análisis: '+(e.message||'error de conexión')); }
   finally{ if(btn){ btn.disabled=false; btn.textContent=lbl; } } }
 $('autoList').addEventListener('click',e=>{ const b=e.target.closest('button[data-aid]'); if(b) openAuto(b.dataset.aid,b); });
 $('autoDate').addEventListener('change',loadAuto);
@@ -1940,7 +2038,7 @@ $('btnAutoRun').onclick=async()=>{
   const btn=$('btnAutoRun'); if(btn.disabled) return;
   if(!autoDay.length) await loadAuto();
   const evs=autoDay.filter(m=>m.state==='pre'); if(!evs.length){ $('autoMsg').textContent='No quedan partidos por jugarse en esta fecha.'; return; }
-  btn.disabled=true; let done=0, saved=0;
+  btn.disabled=true; btn.textContent='Analizando…'; let done=0, saved=0;
   const run={ds:$('autoDate').value,ts:Date.now(),evs,ms:{},items:[]};
   const tick=()=>{ $('autoMsg').textContent=`El robot está analizando ${done} de ${evs.length} partidos…`; }; tick();
   await pool(evs,3,async ev=>{ try{ const m=await buildInputs(ev), res=robotCompute(m);
@@ -1951,27 +2049,40 @@ $('btnAutoRun').onclick=async()=>{
     }catch(e){} finally{ done++; tick(); } });
   autoRun=run; try{ localStorage.setItem(LSA,JSON.stringify(run)); }catch(e){}
   if(saved){ persist(); renderRobot(); }
-  btn.disabled=false;
+  btn.disabled=false; syncDay(); renderAutoList();
   $('autoMsg').textContent=`Listo: ${run.items.length} de ${evs.length} partidos analizados`+(saved?` · ${saved} pronóstico${saved>1?'s':''} guardado${saved>1?'s':''} para aprender`:'')+'.';
   renderRecs(); haptic(); };
+function pickParts(pk,hn,an){
+  if(pk.st==='htr') return {main:'Resultado al descanso: '+(pk.r.length>1?{'1X':hn+' o empate','X2':an+' o empate','12':'no termina empatado'}[pk.r]:{'1':'gana '+hn,'X':'empate','2':'gana '+an}[pk.r]),sub:'Marcador al final del primer tiempo'};
+  return {main:PICKNAMES[pk.st]+': '+(pk.o?'más de ':'menos de ')+pk.l.toFixed(1),sub:pk.s==='home'?'Solo de '+hn:pk.s==='away'?'Solo de '+an:'Suma de los dos equipos'}; }
 function renderRecs(){
-  const box=$('autoRecs'), run=autoRun;
-  if(!run||run.ds!==($('autoDate').value||localDate())){ box.innerHTML=''; return; }
-  const hiOnly=$('autoMin').value==='hi', recs=[];
-  for(const it of run.items) for(const pk of it.picks){ const c=confOf(pk.p); if(!c||(hiOnly&&c!=='alta')) continue; recs.push({it,pk,c}); }
-  recs.sort((u,v)=>v.pk.p-u.pk.p);
-  { const per={}, keep=[]; for(const z of recs){ per[z.it.id]=(per[z.it.id]||0)+1; if(per[z.it.id]<=3) keep.push(z); } recs.length=0; recs.push(...keep); }   // máximo 3 jugadas por partido
-  const tr=(state.cal&&state.cal.trust)||{};
-  if(!recs.length){ box.innerHTML=`<h3 style="margin-top:10px">Recomendaciones del robot</h3><p class="small muted">Hoy el robot no encuentra jugadas con confianza ${hiOnly?'alta':'alta o media'}. Prefiere no recomendar antes que arriesgar.</p>`; return; }
-  box.innerHTML=`<h3 style="margin-top:10px">Recomendaciones del robot · ${recs.length}</h3><div class="recs">${recs.slice(0,40).map(({it,pk,c})=>{ const hn=esc(it.hn), an=esc(it.an), t=tr[pk.st];
-    return `<div class="rec ${c==='alta'?'hi':''}"><div><div class="mk">${pickText(pk,hn,an)}</div>
-      <div class="small muted">${hn} vs ${an} · ${hhmmL(it.t)} · ${esc(it.lname)}${it.est?' · sin estadísticas de liga':''}${t&&t.n>=5?` · historial del mercado ${t.ok}/${t.n}`:''}</div>
-      <div style="margin-top:4px">${confPill(pk.p)} <button type="button" class="mini" data-aid="${esc(it.id)}">Ver análisis</button></div></div>
-      <div class="pp num">${pc(pk.p)}<small>cuota justa ${fair(pk.p)}</small></div></div>`; }).join('')}</div>
-    <p class="small muted">Ordenadas por probabilidad, hasta 3 por partido. La confianza ya incluye lo que el robot aprendió de sus aciertos en cada mercado. Apuesta solo si la cuota de tu casa es mayor que la cuota justa.</p>`; }
+  const box=$('autoRecs'), run=autoRun, ds=$('autoDate').value||localDate();
+  if(!run||run.ds!==ds){ box.innerHTML=`<p class="small muted" style="max-width:60ch">Pulsa el botón y el robot revisará todos los partidos de ${esc(dayWord(ds))} que faltan por jugarse. Te mostrará solo las jugadas en que tiene confianza alta o media.</p>`; return; }
+  const hiOnly=$('autoMin').value==='hi', tr=(state.cal&&state.cal.trust)||{}, groups=[];
+  let nHi=0, nMid=0;
+  for(const it of run.items){ const ps=it.picks.filter(pk=>{ const c=confOf(pk.p); return c&&(!hiOnly||c==='alta'); }).sort((u,v)=>v.p-u.p).slice(0,3);   // hasta 3 por partido
+    if(!ps.length) continue; ps.forEach(pk=>confOf(pk.p)==='alta'?nHi++:nMid++); groups.push({it,ps}); }
+  groups.sort((u,v)=>v.ps[0].p-u.ps[0].p);
+  if(!groups.length){ box.innerHTML=`<p class="small muted">El robot revisó ${run.items.length} partidos y no encuentra jugadas con confianza ${hiOnly?'alta':'alta o media'}. Prefiere no recomendar antes que arriesgar.</p>`; return; }
+  box.innerHTML=`<div class="rsum"><span class="pill">${groups.length} partido${groups.length>1?'s':''}</span>${nHi?`<span class="pill good">${nHi} confianza alta</span>`:''}${nMid?`<span class="pill acc">${nMid} confianza media</span>`:''}</div>
+    <div class="legend"><span><i style="background:var(--good)"></i>Alta: 70% o más</span><span><i style="background:var(--accent)"></i>Media: 60% a 69%</span><span>Cuota justa: lo mínimo que debería pagar tu casa</span></div>
+    <div class="recs">${groups.map(({it,ps})=>{ const hn=esc(it.hn), an=esc(it.an);
+      return `<div class="rgroup"><div class="rgh"><div><div class="t">${hn} <span class="muted">vs</span> ${an}</div><small>${hhmmL(it.t)} · ${esc(it.lname)}${it.est?' · liga sin estadísticas: datos estimados':''}</small></div><button type="button" class="mini" data-aid="${esc(it.id)}">Ver análisis</button></div>
+        ${ps.map(pk=>{ const c=confOf(pk.p), t=tr[pk.st], q=pickParts(pk,hn,an);
+          return `<div class="rpick ${c==='alta'?'hi':''}"><i class="dot" aria-hidden="true"></i><div class="w">${q.main}<small>${q.sub} · confianza ${c}${t&&t.n>=5?` · en este mercado acierta ${t.ok} de ${t.n}`:''}</small></div><div class="pp num">${pc(pk.p)}<small>cuota justa ${fair(pk.p)}</small></div></div>`; }).join('')}</div>`; }).join('')}</div>
+    <p class="small muted">La confianza ya incluye lo que el robot aprendió de sus aciertos en cada mercado. Apuesta solo si tu casa paga más que la cuota justa.</p>`; }
+function kpiHtml(){ const lr=lineRecord(state.history), tot=Object.values(lr).reduce((a,v)=>({n:a.n+v.n,ok:a.ok+v.ok}),{n:0,ok:0});
+  const n=state.history.filter(x=>x.actual).length, pend=state.history.filter(x=>!x.actual).length, lvl=n>=50?'Experto':n>=20?'Analista':n>=5?'Aprendiz':'Novato';
+  return {n,pend,lvl,tot,html:`<div class="kpi acc"><b>${lvl}</b><span>nivel del robot</span></div><div class="kpi"><b>${n}</b><span>partidos aprendidos</span></div>
+    <div class="kpi ${tot.n?(tot.ok/tot.n>=0.6?'good':'warn'):''}"><b>${tot.n?pc(tot.ok/tot.n):'—'}</b><span>${tot.n?`aciertos (${tot.ok} de ${tot.n} jugadas)`:'aciertos: aún sin datos'}</span></div>
+    <div class="kpi ${pend?'warn':''}"><b>${pend}</b><span>esperando resultado</span></div>`}; }
+function renderHome(){ const k=kpiHtml();
+  $('homeKpis').innerHTML=k.html;
+  $('homeLine').textContent=k.n?`Ha aprendido de ${k.n} partido${k.n>1?'s':''}. Registra los resultados solo.`:'Aún no aprende de ningún partido. Empieza pidiendo recomendaciones.';
+  const ho=$('howto'); if(ho&&!ho.dataset.init){ ho.dataset.init='1'; ho.open=k.n<5; } }
 $('autoRecs').addEventListener('click',e=>{ const b=e.target.closest('button[data-aid]'); if(b) openAuto(b.dataset.aid,b); });
 try{ const r=JSON.parse(localStorage.getItem(LSA)); if(r&&r.ds===localDate()&&Array.isArray(r.items)) autoRun=r; }catch(e){}
-loadAuto();
+window.__autoReady=true; renderHome(); loadAuto();
 setTimeout(autoSettle,6000); setInterval(autoSettle,10*6e4);
 </script>
 </body>
