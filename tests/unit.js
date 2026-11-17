@@ -61,6 +61,15 @@ t('aprendizaje: un partido guardado dos veces cuenta una sola vez',()=>{
   const x={id:'a',ts:Date.now(),inputs:{neutral:false,split:false,comp:'España · LaLiga',ev:{id:'9'},home:{name:'A',eid:'10',n:10,wins:5,unbeaten:7,gf:1.3,ga:1,xg:1.3,xga:1,over25:5,btts:5,shots:12,sot:4,corners:5,cards:2},away:{name:'B',eid:'20',n:10,wins:3,unbeaten:6,gf:1,ga:1.3,xg:1,xga:1.3,over25:5,btts:5,shots:10,sot:3,corners:4,cards:2}},actual:{h:2,a:0}};
   const st={history:[x,Object.assign({},x,{id:'b'})]}; H.learnAll(st); assert.strictEqual(st.prof.e10.n,1); assert.strictEqual(st.comp[H.compKey('LaLiga')].n,1); });
 
+t('nombres del informe del usuario se unen con ESPN',()=>{
+  for(const [a,b] of [['LIGA DE LAS NACIONES','Liga de Naciones UEFA'],['AMISTOSO INTERNACIONAL','Amistosos internacionales'],['BRASILEIRAO','Brasil · Serie A'],['LA LIGA 2','España · LaLiga 2']]) assert.strictEqual(H.compKey(a),H.compKey(b),a);
+  for(const [a,b] of [['GALES','Wales'],['DINAMARCA','Denmark'],['NORUEGA','Norway'],['SUECIA','Sweden'],['BOSNIA HERZEGOVINA','Bosnia-Herzegovina']]) assert.strictEqual(H.teamKey(a),H.teamKey(b),a); });
+t('estadísticas en cero de ESPN se descartan (no son un partido real)',()=>{
+  const a={h:0,a:2,shots:[0,0],sot:[0,0],corners:[0,0],cards:[0,1]}; H.cleanActual(a); assert.deepStrictEqual(a,{h:0,a:2});
+  const b={h:1,a:0,shots:[10,4],sot:[3,0],corners:[5,0],cards:[1,1]}; H.cleanActual(b); assert.ok(b.shots,'un partido real no se toca');
+  const e=ev(); e.competitions[0].competitors.forEach(k=>k.statistics=[{name:'totalShots',displayValue:'0'},{name:'shotsOnTarget',displayValue:'0'},{name:'wonCorners',displayValue:'0'}]);
+  const m=H.parseEvent(e,'fifa.friendly'); assert.ok(!m.shots&&!m.corners&&!m.cards); });
+
 // --- Aprendizaje ---
 t('confianza aprendida dentro de sus límites y casi neutra con pocos datos',()=>{ const T=H.trustCal([{ts:Date.now(),actual:{h:0,a:0},picks:[{st:'goals',s:'total',l:2.5,o:1,p:0.8}]}]); assert.ok(T.goals.f<1&&T.goals.f>0.94,'f='+T.goals.f); });
 
