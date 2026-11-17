@@ -48,11 +48,24 @@ t('reconoce el mismo equipo para vincular con ESPN, sin confundir equipos distin
   for(const [a,b] of [['U. de Chile','Universidad de Chile'],['COLO COLO','Colo-Colo'],['Atlético de Madrid','Atlético Madrid'],['Man City','Manchester City']]) assert.ok(H.sameTeam(a,b),a+' = '+b);
   for(const [a,b] of [['Universidad Católica','Universidad de Chile'],['Real Madrid','Real Sociedad'],['Manchester City','Manchester United']]) assert.ok(!H.sameTeam(a,b),a+' ≠ '+b); });
 
+t('competiciones con país no se mezclan; nombre sin país se reconoce si es único',()=>{
+  assert.notStrictEqual(H.compKey('Brasil · Serie A'),H.compKey('Italia · Serie A'));
+  assert.notStrictEqual(H.compKey('Uruguay · Primera'),H.compKey('Paraguay · Primera'));
+  assert.strictEqual(H.compKey('LaLiga'),H.compKey('España · LaLiga')); assert.strictEqual(H.compKey('LIGA DE LAS NACIONES UEFA'),H.compKey('Liga de Naciones UEFA'));
+  assert.notStrictEqual(H.compKey('Serie A'),H.compKey('Italia · Serie A'),'ambiguo: queda aparte'); });
+t('equipos: por número de ESPN, y un nombre escrito a mano se asocia si no es ambiguo',()=>{
+  H.buildAlias([{inputs:{home:{name:'Everton',eid:'1'},away:{name:'Barcelona',eid:'83'}}},{inputs:{home:{name:'Everton CD',eid:'2'},away:{name:'Colo Colo',eid:'3'}}}]);
+  assert.notStrictEqual(H.profKey({name:'Everton',eid:'1'}),H.profKey({name:'Everton CD',eid:'2'}));
+  assert.strictEqual(H.profKey({name:'BARCELONA'}),'e83'); assert.strictEqual(H.profKey({name:'EVERTON'}),'everton','ambiguo: no se asocia'); });
+t('aprendizaje: un partido guardado dos veces cuenta una sola vez',()=>{
+  const x={id:'a',ts:Date.now(),inputs:{neutral:false,split:false,comp:'España · LaLiga',ev:{id:'9'},home:{name:'A',eid:'10',n:10,wins:5,unbeaten:7,gf:1.3,ga:1,xg:1.3,xga:1,over25:5,btts:5,shots:12,sot:4,corners:5,cards:2},away:{name:'B',eid:'20',n:10,wins:3,unbeaten:6,gf:1,ga:1.3,xg:1,xga:1.3,over25:5,btts:5,shots:10,sot:3,corners:4,cards:2}},actual:{h:2,a:0}};
+  const st={history:[x,Object.assign({},x,{id:'b'})]}; H.learnAll(st); assert.strictEqual(st.prof.e10.n,1); assert.strictEqual(st.comp[H.compKey('LaLiga')].n,1); });
+
 // --- Aprendizaje ---
 t('confianza aprendida dentro de sus límites y casi neutra con pocos datos',()=>{ const T=H.trustCal([{ts:Date.now(),actual:{h:0,a:0},picks:[{st:'goals',s:'total',l:2.5,o:1,p:0.8}]}]); assert.ok(T.goals.f<1&&T.goals.f>0.94,'f='+T.goals.f); });
 
 // --- Todos los partidos del conjunto de prueba: datos válidos para el formulario y probabilidades sin NaN ---
-const dsf=process.argv[2]||path.join(__dirname,'.cache','ds5.json');
+const dsf=process.argv[2]||path.join(__dirname,'.cache','ds7.json');
 if(fs.existsSync(dsf)){ const DS=JSON.parse(fs.readFileSync(dsf,'utf8')); let bad=0;
   t(`datos automáticos válidos (${DS.length} partidos)`,()=>{ for(const x of DS){ for(const tm of [x.m.home,x.m.away]){
       const errs=[]; if(!(tm.n>=3&&Number.isInteger(tm.n))) errs.push('n');
