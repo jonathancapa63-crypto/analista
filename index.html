@@ -476,7 +476,7 @@ body[data-tab="memoria"] [data-pane~="memoria"]{display:flex}
 
 <script>
 /*ENGINE*/
-const APP_VERSION='v22 · 2026-11-17';
+const APP_VERSION='v23 · 2026-11-17';
 const TRAIN_MAX=500;        // partidos recientes que usa el ajuste de ponderaciones
 const MU = 1.35;            // goles promedio por equipo y partido (referencia)
 const RHO = -0.10;          // corrección Dixon-Coles para marcadores bajos
@@ -819,7 +819,30 @@ function learnAll(state){
   state.comp=compProfiles(state.history,state.theta);
   state.prof=teamProfiles(state.history,state.cal.ht,state.theta,state.comp,state.cal); }
 /* Memoria por equipo: compara lo que cada equipo hizo con lo que el modelo proyectaba, con freno para pocos partidos */
-const teamKey=n=>String(n||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+const plainKey=n=>String(n||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+// Clave para reconocer un mismo equipo o competición aunque se escriba distinto: sin mayúsculas, tildes, siglas de club ni artículos,
+// y con las selecciones en español (ESPN las trae en inglés)
+const KEY_STOP=new Set(['fc','cf','sc','ac','afc','cd','ca','club','de','del','la','las','el','los','the','of','y','and']);
+const NATION_ES={turkey:'turquia',belgium:'belgica',germany:'alemania',spain:'espana',england:'inglaterra',france:'francia',italy:'italia',netherlands:'paises bajos',holland:'paises bajos',
+ portugal:'portugal',switzerland:'suiza',austria:'austria',poland:'polonia',denmark:'dinamarca',sweden:'suecia',norway:'noruega',finland:'finlandia',iceland:'islandia',scotland:'escocia',wales:'gales',
+ 'northern ireland':'irlanda norte','republic ireland':'irlanda',ireland:'irlanda',croatia:'croacia',serbia:'serbia',slovenia:'eslovenia',slovakia:'eslovaquia','czechia':'republica checa','czech republic':'republica checa',
+ hungary:'hungria',romania:'rumania',bulgaria:'bulgaria',greece:'grecia',ukraine:'ucrania',russia:'rusia',georgia:'georgia',armenia:'armenia',azerbaijan:'azerbaiyan',kazakhstan:'kazajistan',israel:'israel',cyprus:'chipre',
+ albania:'albania','north macedonia':'macedonia norte',montenegro:'montenegro','bosnia-herzegovina':'bosnia herzegovina','bosnia herzegovina':'bosnia herzegovina',kosovo:'kosovo',moldova:'moldavia',belarus:'bielorrusia',
+ lithuania:'lituania',latvia:'letonia',estonia:'estonia',luxembourg:'luxemburgo',malta:'malta',andorra:'andorra','san marino':'san marino',liechtenstein:'liechtenstein','faroe islands':'islas feroe',gibraltar:'gibraltar',
+ brazil:'brasil',argentina:'argentina',uruguay:'uruguay',paraguay:'paraguay',chile:'chile',peru:'peru',bolivia:'bolivia',ecuador:'ecuador',colombia:'colombia',venezuela:'venezuela',
+ mexico:'mexico','united states':'estados unidos',usa:'estados unidos',canada:'canada','costa rica':'costa rica',panama:'panama',honduras:'honduras','el salvador':'el salvador',guatemala:'guatemala',jamaica:'jamaica',haiti:'haiti',
+ 'trinidad tobago':'trinidad tobago',curacao:'curazao',nicaragua:'nicaragua',cuba:'cuba',
+ japan:'japon','south korea':'corea sur','korea republic':'corea sur','north korea':'corea norte',australia:'australia',iran:'iran','saudi arabia':'arabia saudita',qatar:'catar',iraq:'irak',jordan:'jordania',
+ 'united arab emirates':'emiratos arabes unidos',uzbekistan:'uzbekistan',china:'china','new zealand':'nueva zelanda',
+ morocco:'marruecos',egypt:'egipto',algeria:'argelia',tunisia:'tunez',nigeria:'nigeria',senegal:'senegal',ghana:'ghana',cameroon:'camerun','ivory coast':'costa marfil',"cote d'ivoire":'costa marfil','south africa':'sudafrica',
+ mali:'mali','cape verde':'cabo verde','dr congo':'rd congo',
+ 'liga naciones uefa':'uefa nations league','uefa nations league':'uefa nations league','liga naciones concacaf':'concacaf nations league','concacaf nations league':'concacaf nations league',
+ 'copa libertadores':'conmebol libertadores','conmebol libertadores':'conmebol libertadores','copa sudamericana':'conmebol sudamericana','conmebol sudamericana':'conmebol sudamericana',
+ 'champions league':'uefa champions league','europa league':'uefa europa league','conference league':'uefa conference league','amistosos internacionales':'international friendly','amistoso internacional':'international friendly',
+ 'copa mundo':'fifa world cup','mundial':'fifa world cup'};
+const teamKey=n=>{ let p=plainKey(n); const i=p.lastIndexOf('·'); if(i>=0) p=p.slice(i+1).trim();   // "España · LaLiga" = "LaLiga"
+  const k=p.replace(/[.'’,]/g,'').replace(/[-–]/g,' ').split(' ').filter(w=>w&&!KEY_STOP.has(w)).join(' ');
+  return NATION_ES[k]||k||p; };
 const STATK={shots:40,sot:14,corners:16,cards:7};   // freno: equivale a unos 3 partidos promedio de cada estadística
 function teamProfiles(history, gShare, th, comp, cal){
   const P={}, g=t=>{ const k=teamKey(t.name); return P[k]||(P[k]={name:t.name,n:0,gf:0,lf:0,ga:0,la:0,f1:0,ft:0,a1:0,at:0,ok:0,rn:0,sf:{},sa:{}}); };
@@ -1571,8 +1594,8 @@ setInterval(()=>{ updateDue(); if(document.body.dataset.tab==='historial'&&!open
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ updateDue(); if(document.body.dataset.tab==='historial'&&!openId) renderHistory(); } });
 let histShow=30;
 function renderHistory(){
-  const hist=$('history'), q=teamKey($('histQ').value), pend=$('histPend').checked;
-  const all=state.history.filter(x=>(!pend||!x.actual)&&(!q||teamKey(x.inputs.home.name+' '+x.inputs.away.name+' '+(x.inputs.comp||'')).indexOf(q)>=0));
+  const hist=$('history'), q=plainKey($('histQ').value), pend=$('histPend').checked;
+  const all=state.history.filter(x=>(!pend||!x.actual)&&(!q||plainKey(x.inputs.home.name+' '+x.inputs.away.name+' '+(x.inputs.comp||'')).indexOf(q)>=0));
   if(pend){ const o={due:0,live:1,soon:2,nodate:3}; all.sort((u,v)=>(o[matchState(u)]-o[matchState(v)])||((kickTs(u)||0)-(kickTs(v)||0))); }   // primero los que ya terminaron
   $('histMore').hidden=all.length<=histShow; $('histMore').textContent=`Mostrar más partidos (${Math.max(0,all.length-histShow)} restantes)`;
   if(state.history.length&&!all.length){ hist.innerHTML='<p class="muted small">Ningún partido coincide con la búsqueda.</p>'; return; }
@@ -1843,6 +1866,9 @@ async function buildInputs(ev){
   const m={neutral:ev.neutral,split:false,comp:String(ev.lname).slice(0,40),kickoff:localIso(ko),home:teamInputs(ev.home.name,LH,conv),away:teamInputs(ev.away.name,LA,conv),
     ev:{id:ev.id,lg:ev.lg,t:ev.t}};
   if(ev.odds) m.odds=ev.odds;
+  const P=state.prof||{}, C=state.comp||{};
+  for(const t of [m.home,m.away]){ const k=P[teamKey(t.name)]; if(k) t.name=k.name; }
+  { const c=C[teamKey(m.comp)]; if(c) m.comp=c.name; }
   return m; }
 
 /* ---------- Registro automático de resultados: el robot aprende solo ---------- */
