@@ -546,15 +546,15 @@ body:not([data-tab="analisis"]) .hteam b{font-size:18px}
 
 <script>
 /*ENGINE*/
-const APP_VERSION='v25 · 2026-11-17';
+const APP_VERSION='v26 · 2026-11-17';
 const TRAIN_MAX=500;        // partidos recientes que usa el ajuste de ponderaciones
 const MU = 1.35;            // goles promedio por equipo y partido (referencia)
 const RHO = -0.10;          // corrección Dixon-Coles para marcadores bajos
 const SHRINK = 6;           // partidos "fantasma" que acercan muestras chicas al promedio
 // Valores de fábrica ajustados con 700 partidos reales (sep.–oct. 2026) y validados con 468 partidos posteriores
-const THETA0 = {wMkt:0.35, sharp:1.00, wXG:0.85, homeAdv:1.25, rankK:0.25, formK:0.45, goalScale:1.00, wEmp:0.12, wForm:0.30};
-const BOUNDS = {wMkt:[0,0.85], sharp:[0.60,1.50], wXG:[0,1], homeAdv:[1.00,1.50], rankK:[0,0.80], formK:[0,1.20], goalScale:[0.70,1.40], wEmp:[0,0.60], wForm:[0,0.60]};
-const SIGMA  = {wMkt:0.20, sharp:0.20, wXG:0.25, homeAdv:0.12, rankK:0.20, formK:0.30, goalScale:0.18, wEmp:0.15, wForm:0.15};
+const THETA0 = {wMkt:0.70, wMG:0.80, sharp:1.00, wXG:0.85, homeAdv:1.25, rankK:0.25, formK:0.45, goalScale:1.00, wEmp:0.12, wForm:0.30};
+const BOUNDS = {wMkt:[0,0.95], wMG:[0,0.95], sharp:[0.60,1.50], wXG:[0,1], homeAdv:[1.00,1.50], rankK:[0,0.80], formK:[0,1.20], goalScale:[0.70,1.40], wEmp:[0,0.60], wForm:[0,0.60]};
+const SIGMA  = {wMkt:0.20, wMG:0.25, sharp:0.20, wXG:0.25, homeAdv:0.12, rankK:0.20, formK:0.30, goalScale:0.18, wEmp:0.15, wForm:0.15};
 const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
 // Lo aprendido envejece: un partido de hace 180 días pesa la mitad que uno de hoy
 const HALF_LIFE=180; let NOW=Date.now();
@@ -583,10 +583,28 @@ function lambdas(m, th, adj){
   const A = m.split ? sideRatings(m.away, th, MU/g, MU*g) : sideRatings(m.away, th, MU, MU);
   let s = th.formK*(H.ppg-A.ppg)/3;
   if (m.home.rank>0 && m.away.rank>0) s += th.rankK*clamp((m.away.rank-m.home.rank)/50,-1.5,1.5);
-  const lh = clamp(th.goalScale*H.att*A.def/MU*Math.pow(g,e)*Math.exp(s/2)*(adj?adj.h:1), 0.15, 5);
-  const la = clamp(th.goalScale*A.att*H.def/MU*Math.pow(g,-e)*Math.exp(-s/2)*(adj?adj.a:1), 0.15, 5);
-  return {lh, la, H, A};
+  let lh = th.goalScale*H.att*A.def/MU*Math.pow(g,e)*Math.exp(s/2)*(adj?adj.h:1);
+  let la = th.goalScale*A.att*H.def/MU*Math.pow(g,-e)*Math.exp(-s/2)*(adj?adj.a:1);
+  // Goles que espera la casa (cuotas 1X2 + línea de más/menos goles): se mezclan con los del modelo con peso aprendido wMG
+  const mg=th.wMG>0?marketGoals(m):null;
+  if(mg){ const w=th.wMG;
+    if(mg.lh){ lh=Math.exp((1-w)*Math.log(lh)+w*Math.log(mg.lh)); la=Math.exp((1-w)*Math.log(la)+w*Math.log(mg.la)); }
+    else { const f=Math.pow(mg.T/(lh+la),w); lh*=f; la*=f; } }
+  return {lh:clamp(lh,0.15,5), la:clamp(la,0.15,5), H, A};
 }
+/* Goles esperados por la casa: el total sale de la línea de más/menos (sin margen) y el reparto entre equipos, de las cuotas 1X2 */
+const mktCache=new WeakMap();
+function marketGoals(m){
+  if(mktCache.has(m)) return mktCache.get(m); let r=null;
+  const ou=m.ou;
+  if(ou&&ou.o>1&&ou.u>1&&Math.abs(ou.line%1-0.5)<1e-9){
+    const io=1/ou.o, iu=1/ou.u, pO=io/(io+iu); let lo=0.2, hi=8;
+    for(let i=0;i<40;i++){ const mid=(lo+hi)/2; if(countOver(mid,1,ou.line)<pO) lo=mid; else hi=mid; }
+    const T=(lo+hi)/2; r={T};
+    if(m.odds){ const P=mktProbs(m.odds), want=P[0]-P[2]; let a=0.03, b=0.97;
+      for(let i=0;i<30;i++){ const q=(a+b)/2, o=outcomes(scoreMatrix(q*T,(1-q)*T,RHO)); if(o.p1-o.p2<want) a=q; else b=q; }
+      const q=(a+b)/2; r.lh=q*T; r.la=(1-q)*T; } }
+  mktCache.set(m,r); return r; }
 function pois(l, max){ const p=[Math.exp(-l)]; for(let i=1;i<=max;i++) p.push(p[i-1]*l/i); return p; }
 function scoreMatrix(lh, la, rho){
   const N=9, ph=pois(lh,N), pa=pois(la,N), M=[]; let tot=0;
@@ -681,6 +699,7 @@ function train(history){
 const PHI={shots:1.9,sot:1.4,corners:1.45,cards:1.1};   // dispersión medida con partidos reales
 // Peso de lo que concede el rival. Medido con 1.168 partidos: solo mejora las tarjetas; en remates, tiros a puerta y córners agrega ruido.
 const OPP_WS={shots:0,sot:0,corners:0,cards:0.5};
+const FOUL_W=0;   // probado con 468 partidos: las faltas no mejoran la predicción de tarjetas
 const STATS=[['goals','Goles'],['shots','Remates'],['sot','Tiros a puerta'],['corners','Córners'],['cards','Tarjetas']];
 function countOver(mean,phi,line){
   if(!(mean>0)) return 0; const kmax=Math.floor(line); let pm,cdf;
@@ -698,7 +717,9 @@ function statMeans(m,b,stat,cal){
   // Si se conoce lo que concede cada equipo: lo que genera el local × lo que concede el visitante ÷ el promedio de los dos equipos
   const avg=(H[stat]+(H[stat+'A']||H[stat])+A[stat]+(A[stat+'A']||A[stat]))/4;
   const bh=cross(H[stat],A[stat+'A'],avg), ba=cross(A[stat],H[stat+'A'],avg);
-  const h=bh*fh*k*(tm?tm.h:1), a=ba*fa*k*(tm?tm.a:1); return {home:h,away:a,total:h+a};
+  // Tarjetas: si el rival provoca muchas faltas (le cometen más de lo normal), el equipo verá más tarjetas
+  let xh=1, xa=1; if(stat==='cards'&&FOUL_W&&H.fouls>0&&A.fouls>0&&H.foulsA>0&&A.foulsA>0){ xh=Math.pow(clamp((H.fouls+A.foulsA)/2/H.fouls,0.7,1.4),FOUL_W); xa=Math.pow(clamp((A.fouls+H.foulsA)/2/A.fouls,0.7,1.4),FOUL_W); }
+  const h=bh*fh*xh*k*(tm?tm.h:1), a=ba*fa*xa*k*(tm?tm.a:1); return {home:h,away:a,total:h+a};
 }
 function lineOver(m,b,stat,scope,line,cal){
   if(stat==='goals'){
@@ -1033,6 +1054,9 @@ const DEMO={h_name:'Turquía',a_name:'Bélgica',h_rank:31,a_rank:8,h_n:21,a_n:24
  h_gf:1.57,a_gf:2.25,h_ga:1.62,a_ga:1.17,h_xg:1.55,a_xg:1.98,h_xga:1.19,a_xga:1.14,h_shots:17.19,a_shots:17.79,h_sot:5.1,a_sot:6.21,
  h_corners:6,a_corners:7,h_cards:2.71,a_cards:1.75,h_penScored:2,h_penTaken:4,a_penScored:5,a_penTaken:7,a_crowd:54,comp:'Liga de las Naciones UEFA',
  h_f_gf:1,h_f_ga:2.6,h_f_xg:1.42,h_f_xga:1.75,a_f_gf:1.4,a_f_ga:1.4,a_f_xg:1.1,a_f_xga:1.61};
+// Datos automáticos que no tienen casilla en el formulario (lo que concede el rival, faltas, posesión…): viajan aparte para no perderse
+const EXTRA_KEYS=['shotsA','sotA','cornersA','cardsA','fouls','foulsA','poss','estimated','last'];
+const teamExtra=t=>{ const o={}; for(const k of EXTRA_KEYS) if(t[k]!=null) o[k]=t[k]; return o; };
 let formEv=null;   // partido de ESPN cargado en el formulario (para registrar su resultado solo)
 function fill(obj){ clearForm(); for(const k in obj){ if($(k)) $(k).value=obj[k]; } updatePcts(); }
 function clearForm(){ $('form').reset(); $('kdate').value=localDate(); document.querySelectorAll('#form .err').forEach(e=>e.classList.remove('err')); $('errors').hidden=true; updatePcts(); }
@@ -1072,7 +1096,7 @@ function readForm(){
   document.querySelectorAll('#form details.sec').forEach(d=>{ if(d.querySelector('.err')) d.open=true; });
   if(errs.length){ $('errors').innerHTML='<b>No se puede analizar todavía</b><ul>'+errs.map(e=>'<li>'+esc(e)+'</li>').join('')+'</ul>'; $('errors').hidden=false; return null; }
   $('errors').hidden=true;
-  if(formEv&&formEv.h===teamKey(m.home.name)&&formEv.a===teamKey(m.away.name)) m.ev=formEv.ev;
+  if(formEv&&formEv.h===teamKey(m.home.name)&&formEv.a===teamKey(m.away.name)){ if(formEv.ev) m.ev=formEv.ev; if(formEv.ou) m.ou=formEv.ou; Object.assign(m.home,formEv.xh); Object.assign(m.away,formEv.xa); }
   return m;
 }
 
@@ -1325,7 +1349,7 @@ function analyze(m){
       <div class="hscore num" aria-label="Marcador más probable ${t.h} a ${t.a}">${t.h}<i>:</i>${t.a}</div>
       <div class="hteam away"><b class="ac">${an}</b><small>${f2(b.la)} goles esperados</small></div>
     </div>
-    <p class="hnote">Marcador más probable, con ${pc(t.p)}${m.comp?' · '+esc(m.comp):''}</p>
+    <p class="hnote">Marcador más probable, con ${pc(t.p)}${m.comp?' · '+esc(m.comp):''}${m.ou?` · la casa pone la línea en ${m.ou.line} goles`:''}</p>
     ${triBar(q1,qx,q2,hn,an)}
   </div>
 
@@ -1540,7 +1564,7 @@ function savePrediction(){
 }
 
 /* ---------- Panel del robot ---------- */
-const PNAMES={wXG:['Peso del xG frente a los goles reales',x=>pc(x)],homeAdv:['Ventaja de localía',x=>'×'+f2(x)],rankK:['Peso del ranking',f2],formK:['Peso de los puntos por partido',f2],goalScale:['Escala general de goles',x=>'×'+f2(x)],wMkt:['Peso de las cuotas de la casa',x=>pc(x)],sharp:['Seguridad de sus probabilidades',x=>'×'+f2(x)],wEmp:['Peso del historial de resultados',x=>pc(x)],wForm:['Peso de la forma reciente (últimos 5)',x=>pc(x)]};
+const PNAMES={wMG:['Peso de los goles que espera la casa (más/menos y 1X2)',x=>pc(x)],wXG:['Peso del xG frente a los goles reales',x=>pc(x)],homeAdv:['Ventaja de localía',x=>'×'+f2(x)],rankK:['Peso del ranking',f2],formK:['Peso de los puntos por partido',f2],goalScale:['Escala general de goles',x=>'×'+f2(x)],wMkt:['Peso de las cuotas de la casa',x=>pc(x)],sharp:['Seguridad de sus probabilidades',x=>'×'+f2(x)],wEmp:['Peso del historial de resultados',x=>pc(x)],wForm:['Peso de la forma reciente (últimos 5)',x=>pc(x)]};
 function renderRobot(){
   const rec=record(state.history), n=rec.n, pend=state.history.filter(x=>!x.actual).length;
   const lvl=n>=50?'Experto':n>=20?'Analista':n>=5?'Aprendiz':'Novato';
@@ -1749,7 +1773,7 @@ function toForm(m){ const o={neutral:null};
     if(t.form) for(const k in t.form) o[s+'_f_'+k]=t.form[k]; }
   if(m.comp) o.comp=m.comp;
   if(m.kickoff){ o.kdate=m.kickoff.slice(0,10); o.ktime=m.kickoff.slice(11,16); }
-  delete o.neutral; fill(o); formEv=m.ev?{ev:m.ev,h:teamKey(m.home.name),a:teamKey(m.away.name)}:null; $('neutral').checked=!!m.neutral; $('view').value=m.split?'split':'all';
+  delete o.neutral; fill(o); formEv=m.ev||m.ou?{ev:m.ev,ou:m.ou,xh:teamExtra(m.home),xa:teamExtra(m.away),h:teamKey(m.home.name),a:teamKey(m.away.name)}:null; $('neutral').checked=!!m.neutral; $('view').value=m.split?'split':'all';
   if(m.odds){ $('o1').value=m.odds[0]; $('ox').value=m.odds[1]; $('o2').value=m.odds[2]; } }
 $('history').addEventListener('click',e=>{ const btn=e.target.closest('button[data-act]'); if(!btn) return;
   const id=btn.dataset.id, i=state.history.findIndex(x=>x.id===id); if(i<0) return; const x=state.history[i];
@@ -1880,6 +1904,9 @@ function oddsOf(c){ const o=c&&Array.isArray(c.odds)&&c.odds.find(Boolean); if(!
   const ml=o.moneyline||{}, side=k=>{ const z=ml[k]||{}; return (z.close&&z.close.odds)||(z.open&&z.open.odds)||(o[k+'TeamOdds']&&o[k+'TeamOdds'].moneyLine); };
   const v=[usToDec(side('home')),usToDec(o.drawOdds&&o.drawOdds.moneyLine),usToDec(side('away'))];
   return v.every(x=>x>1)?v:null; }
+function ouOf(c){ const o=c&&Array.isArray(c.odds)&&c.odds.find(Boolean); if(!o||!(o.overUnder>0)) return null;
+  const t=o.total||{}, side=k=>{ const z=t[k]||{}; return (z.close&&z.close.odds)||(z.open&&z.open.odds); };
+  const ov=usToDec(side('over')), un=usToDec(side('under')); return ov>1&&un>1?{line:o.overUnder,o:ov,u:un}:null; }
 /* Lectura completa de un partido del marcador de ESPN: goles, descanso, quién marcó primero, remates, córners y tarjetas */
 function parseEvent(e,slug,lname){
   const c=e&&e.competitions&&e.competitions[0]; if(!c||!Array.isArray(c.competitors)) return null;
@@ -1887,10 +1914,10 @@ function parseEvent(e,slug,lname){
   const st=(c.status&&c.status.type)||(e.status&&e.status.type)||{};
   const m={id:String(e.id),lg:slug,lname:lname||LNAME[slug]||slug,t:e.date,state:st.state,done:!!st.completed,et:/AET|PEN/.test(st.name||''),detail:st.shortDetail||'',neutral:!!c.neutralSite,
     home:{id:String(H.team.id),name:H.team.displayName||H.team.name,logo:H.team.logo||'',score:scoreOf(H)},
-    away:{id:String(A.team.id),name:A.team.displayName||A.team.name,logo:A.team.logo||'',score:scoreOf(A)},odds:oddsOf(c)};
+    away:{id:String(A.team.id),name:A.team.displayName||A.team.name,logo:A.team.logo||'',score:scoreOf(A)},odds:oddsOf(c),ou:ouOf(c)};
   const sv=(k,n)=>{ const s=(k.statistics||[]).find(z=>z.name===n); const v=s?Number(s.displayValue):NaN; return isFinite(v)?v:null; };
   const pair=n=>{ const a=sv(H,n), b=sv(A,n); return a!==null&&b!==null?[a,b]:null; };
-  m.shots=pair('totalShots'); m.sot=pair('shotsOnTarget'); m.corners=pair('wonCorners');
+  m.shots=pair('totalShots'); m.sot=pair('shotsOnTarget'); m.corners=pair('wonCorners'); m.fouls=pair('foulsCommitted'); m.poss=pair('possessionPct');
   const det=Array.isArray(c.details)?c.details:[];
   if(m.shots&&m.corners){ const cd=[0,0]; for(const d of det){ if(d.yellowCard||d.redCard){ const tid=String(d.team&&d.team.id); if(tid===m.home.id) cd[0]++; else if(tid===m.away.id) cd[1]++; } } m.cards=cd; }
   // Cronología de goles: se valida contra el marcador final (los autogoles pueden venir con el equipo del autor)
@@ -1929,7 +1956,7 @@ async function teamMatches(team,beforeMs){
   const det=await pool(list,4,x=>x.lg?eventData(x.lg,x.id,x.t):null);
   return list.map((x,i)=>{ const d=det[i], me=x.home?0:1, op=1-me, two=v=>v?[v[me],v[op]]:null;
     const z=Object.assign({},x); if(d&&d.done){ if(d.et){ if(d.reg){ z.gf=d.reg[me]; z.ga=d.reg[op]; } z.ht=two(d.ht); z.first=d.first==null?null:d.first<0?-1:d.first===me?1:0; return z; }
-      z.shots=two(d.shots); z.sot=two(d.sot); z.corners=two(d.corners); z.cards=two(d.cards); z.ht=two(d.ht); z.first=d.first==null?null:d.first<0?-1:d.first===me?1:0; }
+      z.shots=two(d.shots); z.sot=two(d.sot); z.corners=two(d.corners); z.cards=two(d.cards); z.fouls=two(d.fouls); z.poss=two(d.poss); z.ht=two(d.ht); z.first=d.first==null?null:d.first<0?-1:d.first===me?1:0; }
     return z; }); }
 /* Convierte los partidos de un equipo en los mismos datos que se ingresan a mano en la pestaña Partido */
 function teamInputs(name,L,conv){
@@ -1946,6 +1973,8 @@ function teamInputs(name,L,conv){
   const ws=L.filter(x=>x.shots&&x.sot&&x.corners);
   t.estimated=ws.length<Math.min(3,n);
   for(const k of ['shots','sot','corners']){ t[k]=r2(t.estimated?STAT_DEF[k]:avg(ws,x=>x[k][0])); if(!t.estimated) t[k+'A']=r2(avg(ws,x=>x[k][1])); }   // A = lo que concede al rival
+  const wf=L.filter(x=>x.fouls&&x.cards); if(wf.length>=Math.min(3,n)){ t.fouls=r2(avg(wf,x=>x.fouls[0])); t.foulsA=r2(avg(wf,x=>x.fouls[1])); }   // faltas cometidas y recibidas
+  const wp=L.filter(x=>x.poss); if(wp.length>=Math.min(3,n)) t.poss=r2(avg(wp,x=>x.poss[0]));
   const wc=L.filter(x=>x.cards); t.cards=r2(wc.length>=Math.min(3,n)?avg(wc,x=>x.cards[0]):STAT_DEF.cards); if(wc.length>=Math.min(3,n)) t.cardsA=r2(avg(wc,x=>x.cards[1]));
   // xG estimado: tiros a puerta × conversión promedio (los goles reales tienen mucha suerte; los tiros a puerta, menos)
   const xg=a=>{ const w=a.filter(x=>x.sot); return w.length>=Math.min(3,a.length)?{xg:avg(w,x=>x.sot[0])*conv,xga:avg(w,x=>x.sot[1])*conv}:{xg:avg(a,x=>x.gf),xga:avg(a,x=>x.ga)}; };
@@ -1960,7 +1989,7 @@ async function buildInputs(ev){
   const conv=(g+0.31*60)/(s+60);
   const m={neutral:ev.neutral,split:false,comp:String(ev.lname).slice(0,40),kickoff:localIso(ko),home:teamInputs(ev.home.name,LH,conv),away:teamInputs(ev.away.name,LA,conv),
     ev:{id:ev.id,lg:ev.lg,t:ev.t}};
-  if(ev.odds) m.odds=ev.odds;
+  if(ev.odds) m.odds=ev.odds; if(ev.ou) m.ou=ev.ou;
   const P=state.prof||{}, C=state.comp||{};
   for(const t of [m.home,m.away]){ const k=P[teamKey(t.name)]; if(k) t.name=k.name; }
   { const c=C[teamKey(m.comp)]; if(c) m.comp=c.name; }

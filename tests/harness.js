@@ -22,7 +22,7 @@ let state={theta:Object.assign({},THETA0),cal:{},prof:{},comp:{},history:[]};
 ${compute}
 ${auto.replace(/function getJSON\(url,ttl\)\{[\s\S]*?return pr; \}/,'function getJSON(url){ return __curl(url); }')}
 ${actualSrc}
-module.exports={THETA0,BOUNDS,SIGMA,PHI,STATS,predict,robotView,robotPicks,robotCompute,lambdas,statMeans,lineOver,countOver,calibrate,train,learnAll,trustCal,pickHit,lineRecord,record,confOf,teamKey,
+module.exports={marketGoals,THETA0,BOUNDS,SIGMA,PHI,STATS,predict,robotView,robotPicks,robotCompute,lambdas,statMeans,lineOver,countOver,calibrate,train,learnAll,trustCal,pickHit,lineRecord,record,confOf,teamKey,
   parseEvent,dayBoard,eventData,teamMatches,teamInputs,buildInputs,actualOf,pool,LEAGUES,etDaysLocal,etDaysTs,usToDec,
   getState:()=>state,setState:s=>{state=s;},CONF_MID,CONF_HI,PICK_MAX,PICKNAMES,extraMarkets};`;
 const mod={exports:{}};

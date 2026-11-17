@@ -1,4 +1,4 @@
-# Auditoría del robot analista · noviembre 2026 (v25)
+# Auditoría del robot analista · noviembre 2026 (v26)
 
 ## Cómo se midió
 - **1.168 partidos reales** jugados entre septiembre y noviembre de 2026 en 13 competiciones: Premier League, LaLiga, Serie A, Bundesliga, Ligue 1, Portugal, Países Bajos, Argentina, Brasil, Chile, Liga MX, MLS y Champions League.
@@ -34,16 +34,40 @@ Acierto real por tipo de jugada: tarjetas 79%, goles 78%, resultado al descanso 
 - **Probado y descartado:** cruzar lo que genera cada equipo con lo que concede su rival en córners, remates y tiros a puerta. Con muestras de 10 partidos agrega ruido y no mejora.
 - **Resultado en noviembre:** el pronóstico 1X2 mejora (logloss de 1,0107 a 1,0015, menor es mejor) y las jugadas recomendadas suben de 74,3% a 74,4–74,8%.
 
+## v26: más información de ESPN
+ESPN guarda las **cuotas de cierre** de DraftKings de los partidos ya jugados: ganador del partido y línea de más/menos goles. Se consiguieron para 1.156 de los 1.168 partidos, y eso permitió medir y entrenar con el mercado.
+
+**Lo que se agregó:**
+- **Goles que espera la casa.** De la línea de más/menos y las cuotas 1X2 se calculan los goles esperados de cada equipo. Se mezclan con los del modelo, con peso aprendido (de fábrica 80%). Afecta a todas las jugadas de goles: total, por equipo, 1er y 2º tiempo, ambos marcan y resultado al descanso.
+- **Más peso a las cuotas 1X2** (de fábrica 70%, con tope de 95%).
+- **Datos extra que no se perdían antes:** faltas cometidas y recibidas, posesión, y lo que concede el rival. Además, el análisis individual ya no los borra al pasar por el formulario.
+
+**Resultado en noviembre** (partidos que no se usaron para ajustar):
+
+| | v25 | v26 |
+|---|---|---|
+| Jugadas recomendadas | 74,4% | **76,2%** |
+| Ganador del partido (logloss; menor es mejor) | 1,0015 | **0,9329**, mejor que la casa sola (0,9343) |
+| Acierto del favorito | 50,9% | **57,7%** |
+
+Calibración de las jugadas recomendadas: confianza media promete 67,7% y acierta 66,4%; alta promete 75,9% y acierta 76,7%; 80% o más promete 81,7% y acierta 80,0%.
+
+**Probado y descartado** (empeoraban la precisión):
+- Usar las faltas para predecir tarjetas.
+- Usar solo los partidos de local del local y solo los de visita del visitante.
+
 ## Límites que conviene conocer
 - **Remates** es el mercado más débil (68%). Su confianza aprendida lo corrige solo con el tiempo.
-- **Sin información de equipo:** ESPN no entrega xG real, alineaciones ni lesiones. Las cuotas 1X2 de la casa (que el robot sí usa) compensan parte de eso, pero no se pudieron validar con partidos pasados porque ESPN no guarda las cuotas de los partidos terminados.
-- **Partido vs. jugada:** el pronóstico 1X2 acierta el favorito alrededor del 50% de las veces. Lo fuerte del robot son las líneas de más/menos, no el ganador.
+- **Sin información de equipo:** ESPN no entrega xG real ni lesiones, y las alineaciones solo aparecen poco antes del partido. Las cuotas de la casa, que el robot usa, ya incluyen esa información.
+- **Partido vs. jugada:** con cuotas, el favorito acierta alrededor del 58% de las veces. Lo fuerte del robot son las líneas de más/menos.
+- **Sin cuotas no hay mejora de goles:** ligas o partidos donde ESPN no publica cuotas usan solo el modelo estadístico, que es menos preciso.
 - **Memoria:** guarda hasta 1.800 pronósticos. Al llenarse, borra los más antiguos.
 
 ## Pruebas automáticas
 ```
-node tests/unit.js            # 15 pruebas del motor y de los datos (incluye validar los 1.168 partidos)
+node tests/add-odds.js e.json s.json  # agrega las cuotas de cierre de ESPN al conjunto
+node tests/unit.js            # 17 pruebas del motor y de los datos (incluye validar los 1.168 partidos)
 node tests/build-dataset.js   # descarga y arma el conjunto de partidos (queda en caché)
 node tests/backtest.js        # precisión y calibración, aprendiendo como en la app
-node tests/e2e.js             # prueba de punta a punta en el navegador (11 pasos)
+node tests/e2e.js             # prueba de punta a punta en el navegador (12 pasos)
 ```

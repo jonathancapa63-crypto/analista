@@ -12,6 +12,12 @@ t('líneas: más de 0.5 ≥ más de 1.5 ≥ más de 2.5',()=>{ for(const phi of 
 t('Poisson: P(más de 0.5 | media 1) = 1 − e^−1',()=>near(H.countOver(1,1,0.5),1-Math.exp(-1),1e-12));
 t('cuotas americanas a decimales',()=>{ assert.strictEqual(H.usToDec('+150'),2.5); near(H.usToDec('-200'),1.5,1e-9); assert.strictEqual(H.usToDec('x'),null); });
 
+t('goles de la casa: línea 2.5 a cuotas parejas ≈ 2.67 goles, y el favorito recibe más',()=>{ const g=H.marketGoals({ou:{line:2.5,o:1.9,u:1.9},odds:[1.6,4,6]});
+  near(g.T,2.674,0.01,'total'); assert.ok(g.lh>g.la,'reparto'); near(g.lh+g.la,g.T,1e-9);
+  assert.strictEqual(H.marketGoals({ou:{line:2.25,o:1.9,u:1.9}}),null,'líneas asiáticas no se usan'); });
+t('el modelo se acerca a la línea de la casa',()=>{ const base={neutral:false,split:false,home:{n:10,wins:5,unbeaten:7,gf:1.2,ga:1.1,xg:1.2,xga:1.1,over25:5,btts:5,shots:12,sot:4,corners:5,cards:2},away:{n:10,wins:4,unbeaten:6,gf:1.1,ga:1.2,xg:1.1,xga:1.2,over25:5,btts:5,shots:11,sot:4,corners:5,cards:2}};
+  const a=H.lambdas(base,H.THETA0), b=H.lambdas(Object.assign({},base,{ou:{line:3.5,o:1.8,u:2.0}}),H.THETA0); assert.ok(b.lh+b.la>a.lh+a.la+0.5); });
+
 // --- Liquidación de jugadas ---
 t('pickHit: más/menos, por equipo, 1er y 2º tiempo',()=>{ const a={h:2,a:1,ht:[1,0],corners:[6,3]};
   assert.strictEqual(H.pickHit({st:'goals',s:'total',l:2.5,o:1},a),true); assert.strictEqual(H.pickHit({st:'goals',s:'away',l:0.5,o:0},a),false);
@@ -42,7 +48,7 @@ t('mismo equipo con distinta escritura',()=>{ for(const [a,b] of [['TURQUÍA','T
 t('confianza aprendida dentro de sus límites y casi neutra con pocos datos',()=>{ const T=H.trustCal([{ts:Date.now(),actual:{h:0,a:0},picks:[{st:'goals',s:'total',l:2.5,o:1,p:0.8}]}]); assert.ok(T.goals.f<1&&T.goals.f>0.94,'f='+T.goals.f); });
 
 // --- Todos los partidos del conjunto de prueba: datos válidos para el formulario y probabilidades sin NaN ---
-const dsf=process.argv[2]||path.join(__dirname,'.cache','ds2.json');
+const dsf=process.argv[2]||path.join(__dirname,'.cache','ds5.json');
 if(fs.existsSync(dsf)){ const DS=JSON.parse(fs.readFileSync(dsf,'utf8')); let bad=0;
   t(`datos automáticos válidos (${DS.length} partidos)`,()=>{ for(const x of DS){ for(const tm of [x.m.home,x.m.away]){
       const errs=[]; if(!(tm.n>=3&&Number.isInteger(tm.n))) errs.push('n');

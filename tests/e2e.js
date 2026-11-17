@@ -17,6 +17,8 @@ const viaCurl=r=>execFile('curl',['--silent','--show-error','--compressed','--ma
     if(!/Listo/.test(await pg.textContent('#autoMsg'))) throw new Error(await pg.textContent('#autoMsg')); });
   await step('abre un análisis desde una recomendación',async()=>{ const bt=await pg.$('#autoRecs button[data-aid]'); if(!bt) throw new Error('sin recomendaciones'); await bt.click();
     await pg.waitForFunction(()=>document.body.dataset.tab==='robot',null,{timeout:120000}); });
+  await step('el análisis conserva cuotas y datos extra de ESPN',async()=>{ const z=await pg.evaluate(()=>({ou:!!current.m.ou,odds:!!current.m.odds,ev:!!current.m.ev,extra:current.m.home.cardsA!=null}));
+    if(!z.ev||!z.extra) throw new Error(JSON.stringify(z)); if(!z.ou) console.log('      (este partido no trae línea de más/menos)'); });
   for(const v of ['analisis','lineas','partido']) await step('vista '+v,async()=>{ await pg.click(`#subNav [data-go="${v}"]`); if(await pg.evaluate(()=>document.body.dataset.tab)!==v) throw new Error('no cambió'); });
   await step('no duplica el pronóstico ya guardado',async()=>{ await pg.click('#subNav [data-go="robot"]'); if(!(await pg.isDisabled('#btnSave'))) throw new Error('el botón Guardar sigue activo'); });
   await step('Historial',async()=>{ await pg.click('[data-nav="historial"]'); if(!(await pg.$$('#history .hx')).length) throw new Error('vacío'); });
