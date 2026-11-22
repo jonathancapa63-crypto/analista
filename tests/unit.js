@@ -42,7 +42,7 @@ t('0-0 sin estadísticas no cuenta como descanso conocido',()=>{ const e=ev(); c
 
 // --- Nombres ---
 t('mismo equipo con distinta escritura',()=>{ for(const [a,b] of [['TURQUÍA','Turkey'],['ATLÉTICO DE MADRID','Atlético Madrid'],['Liga de las Naciones UEFA','Liga de Naciones UEFA'],['IRLANDA','Republic of Ireland']]) assert.strictEqual(H.teamKey(a),H.teamKey(b),a);
-  assert.notStrictEqual(H.teamKey('Real Madrid'),H.teamKey('Real Sociedad')); });
+  assert.notStrictEqual(H.teamKey('Real Madrid'),H.teamKey('Real Sociedad')); assert.notStrictEqual(H.teamKey('Real Sociedad B'),H.teamKey('Real Sociedad')); });
 
 t('reconoce el mismo equipo para vincular con ESPN, sin confundir equipos distintos',()=>{
   for(const [a,b] of [['U. de Chile','Universidad de Chile'],['COLO COLO','Colo-Colo'],['Atlético de Madrid','Atlético Madrid'],['Man City','Manchester City']]) assert.ok(H.sameTeam(a,b),a+' = '+b);
@@ -63,7 +63,7 @@ t('aprendizaje: un partido guardado dos veces cuenta una sola vez',()=>{
 
 t('nombres del informe del usuario se unen con ESPN',()=>{
   for(const [a,b] of [['LIGA DE LAS NACIONES','Liga de Naciones UEFA'],['AMISTOSO INTERNACIONAL','Amistosos internacionales'],['BRASILEIRAO','Brasil · Serie A'],['LA LIGA 2','España · LaLiga 2']]) assert.strictEqual(H.compKey(a),H.compKey(b),a);
-  for(const [a,b] of [['GALES','Wales'],['DINAMARCA','Denmark'],['NORUEGA','Norway'],['SUECIA','Sweden'],['BOSNIA HERZEGOVINA','Bosnia-Herzegovina']]) assert.strictEqual(H.teamKey(a),H.teamKey(b),a); });
+  for(const [a,b] of [['RCD MALLORCA','Mallorca'],['UD ALMERIA','Almería'],['SD EIBAR','Eibar'],['CE SABADELL','Sabadell'],['ANDORRA CF','FC Andorra'],['GALES','Wales'],['DINAMARCA','Denmark'],['NORUEGA','Norway'],['SUECIA','Sweden'],['BOSNIA HERZEGOVINA','Bosnia-Herzegovina']]) assert.strictEqual(H.teamKey(a),H.teamKey(b),a); });
 t('estadísticas en cero de ESPN se descartan (no son un partido real)',()=>{
   const a={h:0,a:2,shots:[0,0],sot:[0,0],corners:[0,0],cards:[0,1]}; H.cleanActual(a); assert.deepStrictEqual(a,{h:0,a:2});
   const b={h:1,a:0,shots:[10,4],sot:[3,0],corners:[5,0],cards:[1,1]}; H.cleanActual(b); assert.ok(b.shots,'un partido real no se toca');

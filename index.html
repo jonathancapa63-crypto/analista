@@ -555,7 +555,7 @@ const LEAGUES=[['chi.1','Chile · Primera División'],['arg.1','Argentina · Lig
  ['uefa.champions','UEFA Champions League'],['uefa.europa','UEFA Europa League'],['uefa.europa.conf','UEFA Conference League'],['eng.fa','Inglaterra · FA Cup'],['esp.copa_del_rey','España · Copa del Rey'],
  ['fifa.world','Copa del Mundo'],['fifa.worldq.conmebol','Eliminatorias CONMEBOL'],['fifa.worldq.uefa','Eliminatorias UEFA'],['uefa.nations','Liga de Naciones UEFA'],['concacaf.nations.league','Liga de Naciones CONCACAF'],['fifa.friendly','Amistosos internacionales']];
 const LNAME=Object.fromEntries(LEAGUES);
-const APP_VERSION='v31 · 2026-11-17';
+const APP_VERSION='v32 · 2026-11-22';
 const TRAIN_MAX=500;        // partidos recientes que usa el ajuste de ponderaciones
 const MU = 1.35;            // goles promedio por equipo y partido (referencia)
 const RHO = -0.10;          // corrección Dixon-Coles para marcadores bajos
@@ -937,7 +937,7 @@ function learnAll(state){
 const plainKey=n=>String(n||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
 // Clave para reconocer un mismo equipo o competición aunque se escriba distinto: sin mayúsculas, tildes, siglas de club ni artículos,
 // y con las selecciones en español (ESPN las trae en inglés)
-const KEY_STOP=new Set(['fc','cf','sc','ac','afc','cd','ca','club','de','del','la','las','el','los','the','of','y','and']);
+const KEY_STOP=new Set(['fc','cf','sc','ac','afc','cd','ca','club','rcd','ud','sd','ce','cp','rc','ad','sad','ss','as','de','del','la','las','el','los','the','of','y','and']);
 const NATION_ES={turkey:'turquia',belgium:'belgica',germany:'alemania',spain:'espana',england:'inglaterra',france:'francia',italy:'italia',netherlands:'paises bajos',holland:'paises bajos',
  portugal:'portugal',switzerland:'suiza',austria:'austria',poland:'polonia',denmark:'dinamarca',sweden:'suecia',norway:'noruega',finland:'finlandia',iceland:'islandia',scotland:'escocia',wales:'gales',
  'northern ireland':'irlanda norte','republic ireland':'irlanda',ireland:'irlanda',croatia:'croacia',serbia:'serbia',slovenia:'eslovenia',slovakia:'eslovaquia','czechia':'republica checa','czech republic':'republica checa',
