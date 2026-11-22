@@ -1,7 +1,9 @@
 // Prueba de punta a punta en Chromium: Inicio → robot automático → análisis → Historial → Robot.
 // Las llamadas a ESPN pasan por curl (el navegador de pruebas no usa el proxy). Uso: node tests/e2e.js [AAAA-MM-DD] [liga]
 const {chromium}=require('playwright'); const {execFile}=require('child_process'); const path=require('path');
-const DAY=process.argv[2]||'2026-11-21', LG=process.argv[3]||'ita.1';
+// Por defecto, el próximo sábado (el robot solo analiza partidos que faltan por jugarse)
+const nextSat=()=>{ const d=new Date(); d.setDate(d.getDate()+((6-d.getDay()+7)%7||7)); return d.toISOString().slice(0,10); };
+const DAY=process.argv[2]||nextSat(), LG=process.argv[3]||'ita.1';
 const viaCurl=r=>execFile('curl',['--silent','--show-error','--compressed','--max-time','30',r.request().url()],{maxBuffer:256e6},
   (e,out)=>e?r.fulfill({status:500,body:''}):r.fulfill({status:200,headers:{'access-control-allow-origin':'*','content-type':'application/json'},body:out}));
 (async()=>{ const b=await chromium.launch(); const pg=await b.newPage({viewport:{width:400,height:860}}); const errs=[];
